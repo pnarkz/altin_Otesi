@@ -68,6 +68,12 @@ Demo akışı localStorage’a Ayşe Hanım profili yazar:
 - Mesaj ve profil çıktıları karar desteği değil, risk görünürlüğü sağlar.
 - Finansal kararlar için yetkili kurumların resmi bilgileri esas alınmalıdır.
 
+## GitHub Repo Açıklaması
+
+Kısa açıklama önerisi:
+
+`Kadınların finansal güvenini, dolandırıcılık farkındalığını ve evden üretim görünürlüğünü güçlendiren sosyal FinTech MVP.`
+
 ## Notlar
 
 - Veriler istemci tarafında ve localStorage’da tutulur.
@@ -82,3 +88,4 @@ Demo akışı localStorage’a Ayşe Hanım profili yazar:
 - [Final Self Audit](./FINAL_SELF_AUDIT.md)
 - [Jury Q&A](./JURY_QA.md)
 - [Pitch Deck Outline](./PITCH_DECK_OUTLINE.md)
+- [Release Notes](./RELEASE_NOTES.md)
