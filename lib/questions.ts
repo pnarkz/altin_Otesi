@@ -1,0 +1,191 @@
+import { Question } from "@/types";
+
+const scaleChoices = [
+  { label: "1", score: 0 },
+  { label: "2", score: 25 },
+  { label: "3", score: 50 },
+  { label: "4", score: 75 },
+  { label: "5", score: 100 },
+];
+
+export const questions: Question[] = [
+  {
+    id: "q1",
+    layer: "knowledge",
+    type: "multiple",
+    prompt: "Enflasyon ne demektir?",
+    choices: [
+      { label: "Para değer kaybeder", score: 100 },
+      { label: "Para değer kazanır", score: 0 },
+      { label: "Banka faizi yükselir", score: 20 },
+      { label: "Bilmiyorum", score: 0 },
+    ],
+  },
+  {
+    id: "q2",
+    layer: "knowledge",
+    type: "multiple",
+    prompt: "Acil durum fonu nedir?",
+    choices: [
+      { label: "Banka kredisi", score: 0 },
+      { label: "Beklenmedik harcamalar için ayrılan birikim", score: 100 },
+      { label: "Devlet yardımı", score: 0 },
+      { label: "Bilmiyorum", score: 0 },
+    ],
+  },
+  {
+    id: "q3",
+    layer: "knowledge",
+    type: "multiple",
+    prompt: "Vadeli mevduat ile fon arasındaki temel fark nedir?",
+    choices: [
+      { label: "Vadeli mevduat sabit, fon değişken getirili", score: 100 },
+      { label: "İkisi de aynıdır", score: 0 },
+      { label: "Fon her zaman daha kazançlıdır", score: 0 },
+      { label: "Bilmiyorum", score: 0 },
+    ],
+  },
+  {
+    id: "q4",
+    layer: "knowledge",
+    type: "multiple",
+    prompt: "Likidite ne demektir?",
+    choices: [
+      { label: "Bankadaki para", score: 20 },
+      { label: "Bir varlığın hızla nakde çevrilebilme kolaylığı", score: 100 },
+      { label: "Faiz oranı", score: 0 },
+      { label: "Bilmiyorum", score: 0 },
+    ],
+  },
+  {
+    id: "q5",
+    layer: "behavior",
+    type: "multiple",
+    prompt:
+      "WhatsApp'tan '10.000 TL yatır, 1 ayda 18.000 TL al, garanti kazanç' mesajı geldi. Ne yaparsın?",
+    choices: [
+      { label: "Hemen para gönderirim", score: 0 },
+      { label: "Önce daha fazla bilgi isterim", score: 40 },
+      { label: "Resmi kaynaklardan doğrulamadan para göndermem", score: 100 },
+      { label: "Fırsatı kaçırmamak için hızlı davranırım", score: 0 },
+    ],
+  },
+  {
+    id: "q6",
+    layer: "behavior",
+    type: "multiple",
+    prompt: "Ay sonu ev bütçenden 500 TL artırabildin. Ne yaparsın?",
+    choices: [
+      { label: "Altına çeviririm", score: 40 },
+      { label: "Acil durum kumbarama eklerim", score: 100 },
+      { label: "Hemen harcarım", score: 0 },
+      { label: "Sosyal medyada gördüğüm fırsata yatırırım", score: 0 },
+    ],
+  },
+  {
+    id: "q7",
+    layer: "behavior",
+    type: "multiple",
+    prompt: "Komşun garanti kazançlı yatırım fırsatı buldum diyor. Ne yaparsın?",
+    choices: [
+      { label: "Hemen katılırım", score: 0 },
+      { label: "Önce resmi kaynaklardan kontrol ederim", score: 100 },
+      { label: "Reddederim ama nedenini bilmem", score: 35 },
+      { label: "Daha fazla araştırırım", score: 75 },
+    ],
+  },
+  {
+    id: "q8",
+    layer: "behavior",
+    type: "multiple",
+    prompt: "Evden ürettiğin bir şeyi satıyorsan, gelir-giderini takip eder misin?",
+    helper: "Bu soru evden üretimle ilgili profil sinyali üretir.",
+    choices: [
+      { label: "Hayır, üretmiyorum", score: 25 },
+      { label: "Üretiyorum ama takip etmiyorum", score: 35 },
+      { label: "Üretiyorum ve düzenli takip ediyorum", score: 100 },
+      { label: "Üretiyorum ama nasıl hesaplayacağımı bilmiyorum", score: 60 },
+    ],
+  },
+  {
+    id: "q9",
+    layer: "risk",
+    type: "multiple",
+    prompt:
+      "Bir mesaj 'kimseye söyleme, sadece sana özel fırsat' diyor. Bu sana ne anlatır?",
+    choices: [
+      { label: "Gizli bir fırsattır", score: 0 },
+      { label: "Manipülasyon işaretidir", score: 100 },
+      { label: "Daha hızlı karar vermeliyim", score: 0 },
+      { label: "Bilmiyorum", score: 0 },
+    ],
+  },
+  {
+    id: "q10",
+    layer: "risk",
+    type: "multiple",
+    prompt: "IBAN'a doğrudan para gönder denilen yatırım teklifi sana ne hissettirir?",
+    choices: [
+      { label: "Güvenli", score: 0 },
+      { label: "Olağan", score: 0 },
+      { label: "Şüphe uyandırır", score: 100 },
+      { label: "Bilmiyorum", score: 0 },
+    ],
+  },
+  {
+    id: "q11",
+    layer: "risk",
+    type: "multiple",
+    prompt: "Bir reklamda '%100 garanti kazanç' yazıyorsa bu ne anlama gelir?",
+    choices: [
+      { label: "Güvenilirdir", score: 0 },
+      { label: "Yatırımda garanti olmaz, şüphelenmeliyim", score: 100 },
+      { label: "Devlet onaylıdır", score: 0 },
+      { label: "Bilmiyorum", score: 0 },
+    ],
+  },
+  {
+    id: "q12",
+    layer: "risk",
+    type: "multiple",
+    prompt: "Tanımadığın biri 'eve gel, anlatayım' diyorsa ne yaparsın?",
+    choices: [
+      { label: "Giderim", score: 0 },
+      { label: "Gitmem, telefonda konuşmayı tercih ederim", score: 100 },
+      { label: "Bir tanıdığımla giderim", score: 50 },
+      { label: "Düşünmem gerekir", score: 35 },
+    ],
+  },
+  {
+    id: "q13",
+    layer: "attitude",
+    type: "scale",
+    prompt: "Yatırım kelimesi seni nasıl hissettirir?",
+    helper: "1: Çok korkutucu — 5: Çok rahat",
+    choices: scaleChoices,
+  },
+  {
+    id: "q14",
+    layer: "attitude",
+    type: "scale",
+    prompt: "Finansal kararları kendin alabileceğine ne kadar güveniyorsun?",
+    helper: "1: Hiç — 5: Tamamen",
+    choices: scaleChoices,
+  },
+  {
+    id: "q15",
+    layer: "attitude",
+    type: "scale",
+    prompt: "Banka uygulamalarındaki finansal terimleri anlıyor musun?",
+    helper: "1: Hiç — 5: Çok iyi",
+    choices: scaleChoices,
+  },
+  {
+    id: "q16",
+    layer: "attitude",
+    type: "scale",
+    prompt: "Kendi adına finansal hedef koyabileceğine inanıyor musun?",
+    helper: "1: Hiç — 5: Kesinlikle",
+    choices: scaleChoices,
+  },
+];

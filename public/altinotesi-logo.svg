@@ -1,0 +1,25 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="320" rx="36" fill="#FFF8F1"/>
+  <path d="M160 34C129 59 98 70 65 75C66 138 85 190 160 244C235 190 254 138 255 75C222 70 191 59 160 34Z" stroke="#D5AB67" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M160 80L165 95L180 100L165 105L160 120L155 105L140 100L155 95L160 80Z" fill="#D5AB67"/>
+  <path d="M196 85C176 111 165 152 162 204C201 186 224 149 225 112C223 97 214 89 196 85Z" fill="#36665F"/>
+  <path d="M118 118C129 132 138 151 145 174" stroke="#D5AB67" stroke-width="6" stroke-linecap="round"/>
+  <path d="M104 136C116 149 124 166 129 187" stroke="#D5AB67" stroke-width="6" stroke-linecap="round"/>
+  <path d="M93 155C103 165 111 181 116 197" stroke="#D5AB67" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="119" cy="118" r="7" fill="#D5AB67"/>
+  <circle cx="104" cy="136" r="7" fill="#D5AB67"/>
+  <circle cx="93" cy="155" r="7" fill="#D5AB67"/>
+  <path d="M154 122C171 137 178 163 176 207C146 198 127 176 123 149C125 133 136 124 154 122Z" fill="#36665F"/>
+  <path d="M154 177C146 184 144 196 146 208C158 206 165 199 168 189C166 181 161 177 154 177Z" fill="#FFF8F1"/>
+  <path d="M144 205C153 193 171 193 180 205" stroke="#FFF8F1" stroke-width="4" stroke-linecap="round"/>
+  <path d="M104 210C126 187 154 184 179 206C153 214 128 215 104 210Z" fill="#D78C79"/>
+  <path d="M216 210C196 188 172 185 151 203C174 212 195 213 216 210Z" fill="#D78C79"/>
+  <path d="M122 229C140 239 157 241 175 229" stroke="#36665F" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="160" cy="222" rx="20" ry="8" fill="#C4964B"/>
+  <ellipse cx="160" cy="215" rx="20" ry="8" fill="#D5AB67"/>
+  <path d="M151 206C149 197 152 188 160 184C168 188 171 197 169 206" stroke="#FFF8F1" stroke-width="4" stroke-linecap="round"/>
+  <path d="M160 184V170" stroke="#FFF8F1" stroke-width="4" stroke-linecap="round"/>
+  <path d="M160 172C151 167 144 170 141 178C150 180 156 183 160 190" fill="#36665F"/>
+  <path d="M160 172C169 167 176 170 179 178C170 180 164 183 160 190" fill="#36665F"/>
+  <text x="160" y="286" text-anchor="middle" fill="#6F2C39" font-size="40" font-family="Georgia, serif">AltınÖtesi</text>
+</svg>
