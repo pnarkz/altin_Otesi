@@ -1,239 +1,308 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { MessageCircle, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { BrainCircuit, MessageCircle, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { useAppState } from "@/components/providers/app-state-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Toast } from "@/components/ui/toast";
+import {
+  buildLocalCoachReply,
+  CoachAiPayload,
+  DEFAULT_AI_MODEL,
+  requestAiResponse,
+} from "@/lib/ai";
+import {
+  loadAcademyProgress,
+  loadCoachMessages,
+  loadProducerHistory,
+  loadSavingsState,
+  loadScamHistory,
+  saveCoachMessages,
+} from "@/lib/storage";
+import { CoachMessage, CoachReply, ToastTone } from "@/types";
 
-type Thread = {
-  id: string;
-  title: string;
-  messages: { role: "user" | "assistant"; text: string }[];
-  followUps: string[];
-};
-
-const threads: Thread[] = [
-  {
-    id: "inflation",
-    title: "Enflasyon nedir, ev bütçeme etkisi ne?",
-    messages: [
-      { role: "user", text: "Enflasyon nedir, ev bütçeme etkisi ne?" },
-      {
-        role: "assistant",
-        text: "Enflasyon, fiyatların zamanla artması ve aynı parayla daha az ürün alınabilmesi demektir. Bu yüzden market, fatura ve mutfak giderleri daha hızlı hissedilir.",
-      },
-      {
-        role: "user",
-        text: "Bu durumda ne yapmam gerekir?",
-      },
-      {
-        role: "assistant",
-        text: "Belirli bir ürün öneremem. Ama giderlerini görünür kılmak, küçük hedefleri ayrı takip etmek ve acil durum tamponu oluşturmak karar güvenini artırır.",
-      },
-    ],
-    followUps: ["Acil durum fonu neden önemli?", "Bütçe artığını nasıl görürüm?"],
-  },
-  {
-    id: "emergency",
-    title: "Acil durum fonu için ne kadar biriktirmeliyim?",
-    messages: [
-      { role: "user", text: "Acil durum fonu için ne kadar biriktirmeliyim?" },
-      {
-        role: "assistant",
-        text: "Acil durum fonu beklenmedik harcamalar için ayrılan güvenlik alanıdır. Yaygın yaklaşım 3-6 aylık zorunlu giderleri hedeflemek olsa da küçük adımlarla başlamak daha gerçekçidir.",
-      },
-      {
-        role: "user",
-        text: "Aylık giderim 5.000 TL civarında, ne yapabilirim?",
-      },
-      {
-        role: "assistant",
-        text: "Bu durumda 15.000 TL üç aylık, 30.000 TL altı aylık tamponu temsil eder. Ama başlangıç için ayda 200-300 TL ile ilk 1.000-1.500 TL güvenlik alanını kurmak daha uygulanabilir olabilir.",
-      },
-    ],
-    followUps: ["Bu fonu nerede tutmalıyım?", "Acil durum fonu olmadan hangi riskler var?"],
-  },
-  {
-    id: "scam",
-    title: "Garanti kazanç vaadi neden risklidir?",
-    messages: [
-      { role: "user", text: "Garanti kazanç vaadi neden risklidir?" },
-      {
-        role: "assistant",
-        text: "Finansal karar alanında garanti kazanç dili tipik bir risk işaretidir. Özellikle hız baskısı ve resmi olmayan linklerle birleştiğinde dolandırıcılık ihtimali artar.",
-      },
-      {
-        role: "user",
-        text: "Ne yapmalıyım?",
-      },
-      {
-        role: "assistant",
-        text: "Belirli bir işlem öneremem. Ama resmi kurum kaydını doğrulamak, bağımsız kaynaklardan kontrol etmek ve mesajı Dolandırıcılık Kalkanı’nda analiz etmek iyi bir güvenlik adımıdır.",
-      },
-    ],
-    followUps: ["IBAN’a para gönderme neden riskli olabilir?", "Resmi doğrulamayı nasıl yaparım?"],
-  },
-  {
-    id: "profit",
-    title: "Evden ürettiğim ürünün kârını nasıl hesaplarım?",
-    messages: [
-      { role: "user", text: "Evden ürettiğim ürünün kârını nasıl hesaplarım?" },
-      {
-        role: "assistant",
-        text: "Net kâr, toplam gelirinden malzeme, ambalaj, kargo ve varsa diğer giderleri çıkardığında kalan tutardır. Emek süresini de görünür kılarsan saatlik kazancı daha net okuyabilirsin.",
-      },
-      {
-        role: "user",
-        text: "Bu neden önemli?",
-      },
-      {
-        role: "assistant",
-        text: "Belirli bir ürün yönlendirmesi yapamam. Ama kâr görünürlüğü sağlandığında üretim gelirini hedefe bağlamak ve malzeme yenileme kararını daha güvenli vermek kolaylaşır.",
-      },
-    ],
-    followUps: ["Saatlik kazanç nasıl bulunur?", "Kârın bir kısmını nasıl ayırabilirim?"],
-  },
+const starterPrompts = [
+  "Enflasyon ev butcemi nasil etkiler?",
+  "Acil durum fonunu kucuk adimlarla nasil kurabilirim?",
+  "Supheli bir link gordugumde ilk neyi kontrol etmeliyim?",
+  "Evde urettigim bir urunun kari neden bazen gorundugunden dusuk cikiyor?",
 ];
 
+const welcomeMessage: CoachMessage = {
+  id: "welcome",
+  role: "assistant",
+  text:
+    "Merhaba. Burada finansal kavramlari sade dille aciklarim, ama belirli yatirim urunu veya alim-satim tavsiyesi vermem. Sorunu tek bir durum veya ornek uzerinden sorarsan daha net yardimci olurum.",
+  createdAt: new Date(0).toISOString(),
+};
+
+function buildCoachPayload(
+  question: string,
+  messages: CoachMessage[],
+  result: ReturnType<typeof useAppState>["result"],
+): CoachAiPayload {
+  return {
+    question,
+    messages,
+    result,
+    academyProgress: loadAcademyProgress(),
+    savingsState: loadSavingsState(),
+    scamHistory: loadScamHistory(),
+    producerHistory: loadProducerHistory(),
+  };
+}
+
 export default function CoachPage() {
-  const [activeThreadId, setActiveThreadId] = useState(threads[0].id);
+  const { aiSettings, result } = useAppState();
+  const [messages, setMessages] = useState<CoachMessage[]>([welcomeMessage]);
   const [question, setQuestion] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [followUps, setFollowUps] = useState<string[]>(starterPrompts.slice(0, 2));
+  const [caution, setCaution] = useState(
+    "Belirli bir yatirim urunu, alim-satim zamani veya garanti getiri onerisi vermem.",
+  );
   const [toast, setToast] = useState<{
     title: string;
     description?: string;
-    tone: "success" | "error" | "warning" | "info";
+    tone: ToastTone;
   } | null>(null);
 
-  const activeThread = useMemo(
-    () => threads.find((item) => item.id === activeThreadId) ?? threads[0],
-    [activeThreadId],
-  );
+  useEffect(() => {
+    const savedMessages = loadCoachMessages();
+    if (savedMessages.length > 0) {
+      setMessages(savedMessages);
+    }
+    setHistoryReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!historyReady) return;
+    saveCoachMessages(messages);
+  }, [historyReady, messages]);
+
+  const profileSummary = useMemo(() => {
+    if (!result) return "Test sonucu yok. Genel finansal farkindalik modunda calisiyorum.";
+
+    return `${result.profile.name} • ${result.profile.primaryNeed}`;
+  }, [result]);
+
+  const sendQuestion = async (rawQuestion: string) => {
+    const trimmed = rawQuestion.trim();
+    if (!trimmed || loading) return;
+
+    const userMessage: CoachMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+    const nextMessages = [...messages, userMessage];
+    const payload = buildCoachPayload(trimmed, nextMessages, result);
+
+    setMessages(nextMessages);
+    setQuestion("");
+    setLoading(true);
+
+    let reply: CoachReply;
+
+    try {
+      if (aiSettings?.apiKey) {
+        reply = await requestAiResponse("coach", aiSettings, payload);
+      } else {
+        reply = buildLocalCoachReply(payload);
+      }
+    } catch (error) {
+      reply = buildLocalCoachReply(payload);
+      setToast({
+        title: "AI istegi yerel moda dustu",
+        description:
+          error instanceof Error
+            ? error.message
+            : "OpenAI baglantisi kurulamadi, yerel yorum kullanildi.",
+        tone: "warning",
+      });
+    }
+
+    const assistantMessage: CoachMessage = {
+      id: `assistant-${Date.now()}`,
+      role: "assistant",
+      text: reply.answer,
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages((current) => [...current, assistantMessage]);
+    setFollowUps(reply.followUps);
+    setCaution(reply.caution);
+    setLoading(false);
+  };
 
   return (
     <AppShell
       eyebrow="AI Koç"
       title="AI Finans Koçu"
-      description="Sade Türkçe ile kavramları öğren. Yatırım tavsiyesi vermez."
+      description="Profiline ve uygulama icindeki ilerlemene bakarak sade Turkce ile yorum yapar."
       breadcrumb="Anasayfa → AI Koç"
       icon={<MessageCircle className="h-5 w-5" />}
-      ethicNotice="AI Koç eğitim ve farkındalık amaçlıdır. Yatırım kararları için yetkili finans kuruluşlarına başvurun."
+      ethicNotice="AI Koc egitim ve farkindalik amaclidir. Yatirim kararlari icin yetkili finans kuruluslarina basvurun."
       aside={
         <Card>
           <CardHeader>
-            <CardTitle>Güvenlik katmanı</CardTitle>
+            <CardTitle>Baglanti durumu</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <Badge variant="gold">Aktif</Badge>
-            <p className="text-sm text-muted-500">Belirli ürün önerisi vermez.</p>
+          <CardContent className="space-y-3">
+            {aiSettings?.apiKey ? (
+              <>
+                <Badge variant="emerald">OpenAI bagli</Badge>
+                <p className="text-sm text-muted-500">Model: {aiSettings.model || DEFAULT_AI_MODEL}</p>
+              </>
+            ) : (
+              <>
+                <Badge variant="neutral">Yerel fallback</Badge>
+                <p className="text-sm text-muted-500">
+                  Profil ve AI ekranindan key eklediginde gercek model yorumu acilir.
+                </p>
+                <Link href="/profile" className="text-sm font-medium text-burgundy">
+                  Profil ve AI ayarlarina git
+                </Link>
+              </>
+            )}
           </CardContent>
         </Card>
       }
     >
       <Card className="border-warning-500/20 bg-warning-100/70">
         <CardContent className="grid gap-3 py-5 md:grid-cols-2 xl:grid-cols-4">
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-5 w-5 text-warning-500" />
-            <span className="text-sm text-ink-700">Belirli yatırım ürünü önermez</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-5 w-5 text-warning-500" />
-            <span className="text-sm text-ink-700">“Şunu al, bunu sat” demez</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-5 w-5 text-warning-500" />
-            <span className="text-sm text-ink-700">Garanti getiri vaat etmez</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-5 w-5 text-warning-500" />
-            <span className="text-sm text-ink-700">“Senin için en iyisi” demez</span>
-          </div>
+          {[
+            "Belirli yatirim urunu onermez",
+            "Sunu al, bunu sat demez",
+            "Garanti getiri vaat etmez",
+            "Riskli mesajlari sorgulamayi onerir",
+          ].map((item) => (
+            <div key={item} className="flex items-center gap-3">
+              <ShieldAlert className="h-5 w-5 text-warning-500" />
+              <span className="text-sm text-ink-700">{item}</span>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Önerilen sorular</CardTitle>
-            <CardDescription>Profil için öne çıkan başlıklar</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {threads.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveThreadId(item.id)}
-                className={`w-full rounded-2xl border px-4 py-4 text-left text-sm transition ${
-                  activeThreadId === item.id
-                    ? "border-gold-400 bg-gold-400/10"
-                    : "border-ivory-200 bg-ivory-50 hover:border-gold-400"
-                }`}
-              >
-                {item.title}
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Onerilen baslangic sorulari</CardTitle>
+              <CardDescription>Profil ve modullere uygun giris noktasi</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {starterPrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => void sendQuestion(prompt)}
+                  className="w-full rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-4 text-left text-sm transition hover:border-gold-400 hover:bg-white"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="h-5 w-5 text-emerald-700" />
+                <CardTitle>Aktif baglam</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-ink-700">
+              <p>{profileSummary}</p>
+              <p className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4 text-muted-500">
+                Bu ekran, test profilini ve diger modullerdeki ilerlemeyi sohbetin tonuna dahil
+                eder.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card variant="premium">
           <CardHeader>
-            <CardTitle>{activeThread.title}</CardTitle>
-            <CardDescription>Yatırım tavsiyesi içermeyen örnek thread</CardDescription>
+            <CardTitle>Canli sohbet</CardTitle>
+            <CardDescription>Her soru yeni bir toast yerine gercek konusmaya eklenir.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeThread.messages.map((message, index) => (
-              <div
-                key={`${message.role}-${index}`}
-                className={`rounded-2xl px-4 py-4 text-sm leading-relaxed ${
-                  message.role === "user"
-                    ? "border border-ivory-200 bg-white text-ink-700"
-                    : "border border-gold-400/25 bg-ivory-50 text-ink-700"
-                }`}
-              >
-                <p className="mb-2 font-medium">
-                  {message.role === "user" ? "Kullanıcı" : "AltınÖtesi Koçu"}
-                </p>
-                <p>{message.text}</p>
-              </div>
-            ))}
+            <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`rounded-2xl px-4 py-4 text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "border border-ivory-200 bg-white text-ink-700"
+                      : "border border-gold-400/25 bg-ivory-50 text-ink-700"
+                  }`}
+                >
+                  <p className="mb-2 font-medium">
+                    {message.role === "user" ? "Kullanici" : "AltinOtesi Kocu"}
+                  </p>
+                  <p className="whitespace-pre-line">{message.text}</p>
+                </div>
+              ))}
+              {loading ? (
+                <div className="rounded-2xl border border-gold-400/25 bg-ivory-50 px-4 py-4 text-sm text-muted-500">
+                  AI cevap hazirlaniyor...
+                </div>
+              ) : null}
+            </div>
 
             <div className="rounded-2xl border border-ivory-200 bg-white p-4">
-              <p className="text-sm font-medium text-ink-900">Önerilen sonraki sorular</p>
+              <p className="text-sm font-medium text-ink-900">Sonraki sorular</p>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
-                {activeThread.followUps.map((item) => (
-                  <div
+                {followUps.map((item) => (
+                  <button
                     key={item}
-                    className="rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-3 text-sm text-ink-700"
+                    type="button"
+                    onClick={() => void sendQuestion(item)}
+                    className="rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-3 text-left text-sm text-ink-700 transition hover:border-gold-400 hover:bg-white"
                   >
                     {item}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
 
+            <div className="rounded-2xl border border-warning-500/20 bg-warning-100/70 p-4 text-sm text-ink-700">
+              {caution}
+            </div>
+
             <Textarea
               label="Yeni soru sor"
-              placeholder="Soru sor..."
+              placeholder="Ornek: Bu ay artan market giderini nereden okumaliyim?"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               className="min-h-[120px]"
             />
-            <Button
-              onClick={() => {
-                setQuestion("");
-                setToast({
-                  title: "Mock cevap üretildi",
-                  description:
-                    "Bu örnek akışta koç yalnızca açıklama ve karar kriteri dili üretir.",
-                  tone: "info",
-                });
-              }}
-            >
-              Gönder
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => void sendQuestion(question)} loading={loading}>
+                Gonder
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setMessages([welcomeMessage]);
+                  setFollowUps(starterPrompts.slice(0, 2));
+                  setCaution(
+                    "Belirli bir yatirim urunu, alim-satim zamani veya garanti getiri onerisi vermem.",
+                  );
+                }}
+              >
+                Sohbeti sifirla
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

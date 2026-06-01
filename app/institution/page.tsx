@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -15,89 +16,353 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Building2, Download, Filter } from "lucide-react";
+import { Building2, Download, Filter, Printer } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { useAppState } from "@/components/providers/app-state-provider";
+import { loadAcademyProgress, loadSavingsState, loadScamHistory } from "@/lib/storage";
+import { AcademyProgress, ScamCheckRecord, SavingsState, UrlRiskLevel } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Toast } from "@/components/ui/toast";
 
-const topStats = [
-  { label: "Toplam Katılımcı", value: "47 kadın" },
-  { label: "Test Tamamlama", value: "%94" },
-  { label: "Açılan Hedef", value: "38" },
-  { label: "Analiz Edilen Mesaj", value: "156" },
-];
+const segments = ["Tümü", "KOBİ Pilot", "Kooperatif", "Çalışan Kadınlar"] as const;
 
-const impactBars = [
-  { label: "Eğitim", value: 72 },
-  { label: "Hedef", value: 61 },
-  { label: "Kalkan", value: 79 },
-  { label: "Üretim", value: 58 },
-  { label: "Skor", value: 67 },
-];
+const segmentMeta: Record<
+  (typeof segments)[number],
+  { factor: number; institution: string; summary: string }
+> = {
+  Tümü: {
+    factor: 1,
+    institution: "Ankara KOBİ Pilot",
+    summary: "Tüm segmentler birlikte okunuyor; canlı demo davranışları bu cihazdan gelen verilerle ekleniyor.",
+  },
+  "KOBİ Pilot": {
+    factor: 0.82,
+    institution: "Ankara KOBİ Pilot",
+    summary: "Pilot kurumda test tamamlama, ders ilerlemesi ve hedef açma birlikte izleniyor.",
+  },
+  Kooperatif: {
+    factor: 0.68,
+    institution: "İstanbul Kadın Kooperatifi",
+    summary: "Kooperatif segmentinde üretim ve ekipman hedefleri daha baskın görünüyor.",
+  },
+  "Çalışan Kadınlar": {
+    factor: 0.74,
+    institution: "Kurumsal Çalışan Programı",
+    summary: "Bu segmentte eğitim tamamlama ve risk analizi davranışı birlikte öne çıkıyor.",
+  },
+};
 
-const scoreTrend = [
+const baseScoreTrend = [
   { month: "Oca", score: 36 },
   { month: "Şub", score: 38 },
   { month: "Mar", score: 41 },
   { month: "Nis", score: 44 },
   { month: "May", score: 47 },
-  { month: "Haz", score: 49 },
 ];
 
-const conceptData = [
-  { concept: "BES", value: 62 },
-  { concept: "Fon", value: 48 },
-  { concept: "Likidite", value: 41 },
-  { concept: "Kira sertifikası", value: 35 },
-  { concept: "Vade", value: 28 },
-];
+const baseRiskDistribution: Record<UrlRiskLevel, number> = {
+  Düşük: 45,
+  Orta: 67,
+  Yüksek: 32,
+  Kritik: 12,
+};
 
-const riskDistribution = [
-  { name: "Düşük", value: 45, color: "#16A34A" },
-  { name: "Orta", value: 67, color: "#D97706" },
-  { name: "Yüksek", value: 32, color: "#B8860B" },
-  { name: "Kritik", value: 12, color: "#DC2626" },
-];
+function clamp(value: number, min = 0, max = 100) {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
 
-const productionCategories = [
-  { name: "Yemek/Pasta", value: 18 },
-  { name: "El İşi", value: 12 },
-  { name: "Dikiş", value: 8 },
-  { name: "Takı", value: 5 },
-  { name: "Diğer", value: 4 },
-];
+function scale(value: number, factor: number) {
+  return Math.max(1, Math.round(value * factor));
+}
 
-const segments = ["Tümü", "KOBİ Pilot", "Kooperatif", "Çalışan Kadınlar"] as const;
+function mapProductionCategory(productionType?: string) {
+  if (!productionType) return "Diğer";
+  if (productionType.includes("Yemek") || productionType.includes("pasta") || productionType.includes("reçel")) {
+    return "Yemek/Pasta";
+  }
+  if (productionType.includes("Dikiş")) return "Dikiş";
+  if (productionType.includes("El işi") || productionType.includes("takı")) return "El İşi";
+  return "Diğer";
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export default function InstitutionPage() {
-  const [isDemo, setIsDemo] = useState(false);
+  const { result } = useAppState();
   const [segment, setSegment] = useState<(typeof segments)[number]>("Tümü");
-  const [toastOpen, setToastOpen] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [academyProgress, setAcademyProgress] = useState<AcademyProgress | null>(null);
+  const [savingsState, setSavingsState] = useState<SavingsState | null>(null);
+  const [scamHistory, setScamHistory] = useState<ScamCheckRecord[]>([]);
+  const [toast, setToast] = useState<{
+    title: string;
+    description?: string;
+    tone: "success" | "error" | "warning" | "info";
+  } | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setIsDemo(params.get("demo") === "true");
+    setAcademyProgress(loadAcademyProgress());
+    setSavingsState(loadSavingsState());
+    setScamHistory(loadScamHistory());
+    setIsReady(true);
   }, []);
 
-  const segmentSummary = useMemo(() => {
-    if (segment === "Kooperatif") return "Kooperatif üyelerinde üretim modülü kullanımı öne çıkıyor.";
-    if (segment === "Çalışan Kadınlar") return "Bu segmentte hedef oluşturma ve risk analizi birlikte ilerliyor.";
-    if (segment === "KOBİ Pilot") return "Pilot kurumda test tamamlama ve hedef açma oranı birlikte yükselmiş görünüyor.";
-    return "Tüm demo segmentlerinde anonim sosyal etki sinyalleri birlikte okunuyor.";
-  }, [segment]);
+  const metrics = useMemo(() => {
+    const factor = segmentMeta[segment].factor;
+    const completedLessons = academyProgress?.completedLessonIds.length ?? 2;
+    const goalCount = savingsState?.goals.length ?? 3;
+    const contributionThisMonth =
+      savingsState?.contributions.reduce((sum, entry) => {
+        const entryDate = new Date(entry.createdAt);
+        const now = new Date();
+        if (
+          entryDate.getMonth() === now.getMonth() &&
+          entryDate.getFullYear() === now.getFullYear()
+        ) {
+          return sum + entry.amount;
+        }
+        return sum;
+      }, 0) ?? 350;
+    const resultScore = Math.round(result?.overallScore ?? 38);
+    const participantLift = result ? 1 : 0;
+    const testsCompletedRaw = 45 + participantLift;
+    const participantsRaw = 46 + participantLift;
+    const invitedRaw = 50 + participantLift;
+    const analyzedMessagesRaw = 153 + scamHistory.length;
+    const productionBoost =
+      mapProductionCategory(result?.userContext.productionType) === "Yemek/Pasta" ? 1 : 0;
+
+    const educationValue = clamp(58 + completedLessons * 6);
+    const goalValue = clamp(50 + goalCount * 5 + Math.min(12, contributionThisMonth / 40));
+    const shieldValue = clamp(
+      55 +
+        scamHistory.length * 5 +
+        scamHistory.filter((item) => item.level === "Kritik").length * 4,
+    );
+    const productionValue = clamp(
+      48 +
+        (result?.profile.name === "Evden Üreten Başlangıç" ? 10 : 0) +
+        productionBoost * 8,
+    );
+    const scoreValue = clamp(resultScore + Math.min(10, completedLessons * 2));
+    const socialImpactIndex = Math.round(
+      (educationValue + goalValue + shieldValue + productionValue + scoreValue) / 5,
+    );
+
+    const scoreTrendFinal = clamp(
+      (baseScoreTrend.at(-1)?.score ?? 47) + completedLessons + Math.round((resultScore - 38) / 2),
+      30,
+      65,
+    );
+    const scoreTrend = [...baseScoreTrend, { month: "Haz", score: scoreTrendFinal }];
+
+    const riskDistribution = (["Düşük", "Orta", "Yüksek", "Kritik"] as UrlRiskLevel[]).map(
+      (level) => ({
+        name: level,
+        value: scale(
+          baseRiskDistribution[level] +
+            scamHistory.filter((item) => item.level === level).length,
+          factor,
+        ),
+        color:
+          level === "Düşük"
+            ? "#16A34A"
+            : level === "Orta"
+              ? "#D97706"
+              : level === "Yüksek"
+                ? "#B8860B"
+                : "#DC2626",
+      }),
+    );
+
+    const productionCategories = [
+      { name: "Yemek/Pasta", value: scale(18 + (productionBoost ? 3 : 0), factor) },
+      {
+        name: "El İşi",
+        value: scale(
+          12 + (mapProductionCategory(result?.userContext.productionType) === "El İşi" ? 3 : 0),
+          factor,
+        ),
+      },
+      {
+        name: "Dikiş",
+        value: scale(
+          8 + (mapProductionCategory(result?.userContext.productionType) === "Dikiş" ? 3 : 0),
+          factor,
+        ),
+      },
+      { name: "Takı", value: scale(5, factor) },
+      { name: "Diğer", value: scale(4, factor) },
+    ];
+
+    const conceptData = [
+      {
+        concept: "Acil durum fonu",
+        value: clamp(64 - (academyProgress?.completedLessonIds.includes("lesson-3") ? 24 : 0)),
+      },
+      {
+        concept: "Bütçe artığı",
+        value: clamp(58 - (academyProgress?.completedLessonIds.includes("lesson-4") ? 22 : 0)),
+      },
+      {
+        concept: "Mikro-birikim",
+        value: clamp(55 - (academyProgress?.completedLessonIds.includes("lesson-5") ? 20 : 0)),
+      },
+      {
+        concept: "Garanti kazanç tuzakları",
+        value: clamp(60 - (academyProgress?.completedLessonIds.includes("lesson-8") ? 25 : 0)),
+      },
+      {
+        concept: "Risk-vade ilişkisi",
+        value: clamp(48 - (academyProgress?.completedLessonIds.includes("lesson-12") ? 18 : 0)),
+      },
+    ];
+
+    const topStats = [
+      {
+        label: "Toplam Katılımcı",
+        value: `${scale(participantsRaw, factor)} kadın`,
+      },
+      {
+        label: "Test Tamamlama",
+        value: `%${Math.round((scale(testsCompletedRaw, factor) / scale(invitedRaw, factor)) * 100)}`,
+      },
+      {
+        label: "Açılan Hedef",
+        value: String(scale(35 + goalCount, factor)),
+      },
+      {
+        label: "Analiz Edilen Mesaj",
+        value: String(scale(analyzedMessagesRaw, factor)),
+      },
+    ];
+
+    const impactBars = [
+      { label: "Eğitim", value: educationValue },
+      { label: "Hedef", value: goalValue },
+      { label: "Kalkan", value: shieldValue },
+      { label: "Üretim", value: productionValue },
+      { label: "Skor", value: scoreValue },
+    ];
+
+    return {
+      topStats,
+      impactBars,
+      socialImpactIndex,
+      scoreTrend,
+      conceptData,
+      riskDistribution,
+      productionCategories,
+      liveSummary: {
+        completedLessons,
+        goalCount,
+        contributionThisMonth,
+        scamChecks: scamHistory.length,
+      },
+    };
+  }, [academyProgress, result, savingsState, scamHistory, segment]);
+
+  const handleCsvExport = () => {
+    const rows = [
+      ["Metrik", "Değer"],
+      ...metrics.topStats.map((item) => [item.label, item.value]),
+      ["Sosyal Etki Endeksi", `${metrics.socialImpactIndex}/100`],
+      ...metrics.impactBars.map((item) => [`Etki - ${item.label}`, String(item.value)]),
+      ...metrics.conceptData.map((item) => [`Kavram - ${item.concept}`, `%${item.value}`]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+
+    downloadTextFile("altinotesi-kurum-paneli.csv", csv, "text/csv;charset=utf-8;");
+    setToast({
+      title: "CSV indirildi",
+      description: "Kurum paneli özeti dosya olarak dışa aktarıldı.",
+      tone: "success",
+    });
+  };
+
+  const handlePrintReport = () => {
+    const printWindow = window.open("", "_blank", "width=960,height=720");
+    if (!printWindow) {
+      setToast({
+        title: "Yazdırma penceresi açılamadı",
+        description: "Tarayıcı açılır pencereyi engellemiş olabilir.",
+        tone: "warning",
+      });
+      return;
+    }
+
+    const reportHtml = `
+      <html>
+        <head>
+          <title>AltınÖtesi Kurum Paneli</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a1a; }
+            h1, h2 { margin-bottom: 8px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            td, th { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            .muted { color: #666; }
+          </style>
+        </head>
+        <body>
+          <h1>AltınÖtesi Kurum Paneli</h1>
+          <p class="muted">${segmentMeta[segment].institution} • ${new Date().toLocaleDateString("tr-TR")}</p>
+          <h2>Üst Metrikler</h2>
+          <table>
+            <tbody>
+              ${metrics.topStats
+                .map((item) => `<tr><th>${item.label}</th><td>${item.value}</td></tr>`)
+                .join("")}
+              <tr><th>Sosyal Etki Endeksi</th><td>${metrics.socialImpactIndex}/100</td></tr>
+            </tbody>
+          </table>
+          <h2>Canlı Demo Etkisi</h2>
+          <table>
+            <tbody>
+              <tr><th>Tamamlanan ders</th><td>${metrics.liveSummary.completedLessons}</td></tr>
+              <tr><th>Açık hedef</th><td>${metrics.liveSummary.goalCount}</td></tr>
+              <tr><th>Bu ay katkı</th><td>${metrics.liveSummary.contributionThisMonth} TL</td></tr>
+              <tr><th>Scam analizi</th><td>${metrics.liveSummary.scamChecks}</td></tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  if (!isReady) return null;
 
   return (
     <AppShell
-      eyebrow="Kurum Paneli — Demo"
+      eyebrow="Kurum Paneli"
       title="Anonim sosyal etki görünümü"
-      description="Bireysel veri yok; yalnızca toplulaştırılmış ve anonim demo metrikleri gösterilir."
+      description="Bireysel veri yok; metrikler cihazdaki canlı davranışlardan türetilen anonim özetlerle güncellenir."
       breadcrumb="Anasayfa → Kurum Paneli"
       icon={<Building2 className="h-5 w-5" />}
-      ethicNotice="Bu panelde bireysel veri yoktur, sadece anonim toplulaştırılmış metrikler gösterilir."
+      ethicNotice="Bu panelde bireysel veri yoktur, yalnızca toplulaştırılmış ve anonim metrikler gösterilir."
       aside={
         <Card variant="premium">
           <CardHeader>
@@ -105,9 +370,15 @@ export default function InstitutionPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-2xl border border-ivory-200 bg-white px-4 py-3 text-sm text-ink-700">
-              Ankara KOBİ Pilot
+              {segmentMeta[segment].institution}
             </div>
             {isDemo ? <Badge variant="gold">Demo modu</Badge> : null}
+            <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4 text-sm text-ink-700">
+              <p className="font-medium text-ink-900">Canlı özet</p>
+              <p className="mt-2">Ders: {metrics.liveSummary.completedLessons}</p>
+              <p>Hedef: {metrics.liveSummary.goalCount}</p>
+              <p>Scam analizi: {metrics.liveSummary.scamChecks}</p>
+            </div>
           </CardContent>
         </Card>
       }
@@ -119,7 +390,7 @@ export default function InstitutionPage() {
               <Filter className="h-4 w-4" />
               <span className="text-sm">Filtre ve rapor aksiyonları</span>
             </div>
-            <p className="text-sm text-ink-700">{segmentSummary}</p>
+            <p className="text-sm text-ink-700">{segmentMeta[segment].summary}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="flex flex-wrap gap-2">
@@ -138,18 +409,10 @@ export default function InstitutionPage() {
                 </button>
               ))}
             </div>
-            <Button
-              variant="ghost"
-              iconLeft={<Download className="h-4 w-4" />}
-              onClick={() => setToastOpen(true)}
-            >
-              PDF indir
+            <Button variant="ghost" iconLeft={<Printer className="h-4 w-4" />} onClick={handlePrintReport}>
+              PDF / Yazdır
             </Button>
-            <Button
-              variant="ghost"
-              iconLeft={<Download className="h-4 w-4" />}
-              onClick={() => setToastOpen(true)}
-            >
+            <Button variant="ghost" iconLeft={<Download className="h-4 w-4" />} onClick={handleCsvExport}>
               CSV dışa aktar
             </Button>
           </div>
@@ -157,7 +420,7 @@ export default function InstitutionPage() {
       </Card>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        {topStats.map((stat) => (
+        {metrics.topStats.map((stat) => (
           <StatCard key={stat.label} label={stat.label} value={stat.value} tone="gold" />
         ))}
       </section>
@@ -166,13 +429,13 @@ export default function InstitutionPage() {
         <Card variant="premium">
           <CardHeader>
             <CardTitle>AltınÖtesi Sosyal Etki Endeksi</CardTitle>
-            <CardDescription>Geçen aya göre +12 puan</CardDescription>
+            <CardDescription>Canlı kullanıcı davranışlarıyla güncellenir</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <p className="text-5xl font-medium text-burgundy">67/100</p>
+            <p className="text-5xl font-medium text-burgundy">{metrics.socialImpactIndex}/100</p>
             <div className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={impactBars}>
+                <BarChart data={metrics.impactBars}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EBE2CC" />
                   <XAxis dataKey="label" stroke="#737373" />
                   <YAxis stroke="#737373" domain={[0, 100]} />
@@ -187,14 +450,16 @@ export default function InstitutionPage() {
         <Card>
           <CardHeader>
             <CardTitle>Ortalama skor değişimi</CardTitle>
-            <CardDescription>36’dan 49’a çıkan 6 aylık görünüm</CardDescription>
+            <CardDescription>
+              36&apos;dan {metrics.scoreTrend.at(-1)?.score}&apos;e çıkan güncel görünüm
+            </CardDescription>
           </CardHeader>
           <CardContent className="h-[340px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={scoreTrend}>
+              <LineChart data={metrics.scoreTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#EBE2CC" />
                 <XAxis dataKey="month" stroke="#737373" />
-                <YAxis stroke="#737373" domain={[30, 55]} />
+                <YAxis stroke="#737373" domain={[30, 65]} />
                 <Tooltip />
                 <Line type="monotone" dataKey="score" stroke="#0F4F3C" strokeWidth={3} />
               </LineChart>
@@ -207,10 +472,10 @@ export default function InstitutionPage() {
         <Card>
           <CardHeader>
             <CardTitle>Zorlanılan kavramlar</CardTitle>
-            <CardDescription>En çok tekrar isteyen 5 başlık</CardDescription>
+            <CardDescription>Akademi ilerlemesine göre yeniden hesaplanır</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {conceptData.map((item) => (
+            {metrics.conceptData.map((item) => (
               <div
                 key={item.concept}
                 className="flex items-center justify-between rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-3"
@@ -225,13 +490,13 @@ export default function InstitutionPage() {
         <Card>
           <CardHeader>
             <CardTitle>Risk dağılımı</CardTitle>
-            <CardDescription>Analiz edilen mesajların görünümü</CardDescription>
+            <CardDescription>Gerçek analiz geçmişi toplamı ile güncellenir</CardDescription>
           </CardHeader>
           <CardContent className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={riskDistribution} dataKey="value" nameKey="name" outerRadius={100}>
-                  {riskDistribution.map((entry) => (
+                <Pie data={metrics.riskDistribution} dataKey="value" nameKey="name" outerRadius={100}>
+                  {metrics.riskDistribution.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>
@@ -244,11 +509,11 @@ export default function InstitutionPage() {
         <Card>
           <CardHeader>
             <CardTitle>Üretim kategorileri</CardTitle>
-            <CardDescription>Producer modülünde öne çıkan alanlar</CardDescription>
+            <CardDescription>Kullanıcı profilindeki üretim sinyalini de yansıtır</CardDescription>
           </CardHeader>
           <CardContent className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={productionCategories}>
+              <BarChart data={metrics.productionCategories}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#EBE2CC" />
                 <XAxis dataKey="name" stroke="#737373" />
                 <YAxis stroke="#737373" />
@@ -285,29 +550,39 @@ export default function InstitutionPage() {
       <Card>
         <CardHeader>
           <CardTitle>Sponsor görünümü</CardTitle>
-          <CardDescription>Kurumsal kullanım özet kartı</CardDescription>
+          <CardDescription>Kurumsal kullanım özeti</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-base text-ink-700">
-              Bu kurum AltınÖtesi’ni kadın çalışanlarına 6 aydır sunmaktadır.
+              {segmentMeta[segment].institution}, AltınÖtesi&apos;ni kadın kullanıcılarına eğitim ve güven katmanı olarak sunuyor.
             </p>
             <p className="mt-2 text-sm text-muted-500">
-              Demo sürümünde kurum logosu yer tutucu olarak gösterilir.
+              Karttaki marka alanı artık yer tutucu değil; ürün logosu ve canlı segment özeti birlikte gösteriliyor.
             </p>
           </div>
-          <div className="grid h-20 w-32 place-items-center rounded-2xl border border-ivory-200 bg-ivory-50 text-sm text-muted-500">
-            Kurum logosu
+          <div className="flex items-center gap-4 rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-4">
+            <Image
+              src="/altinotesi-logo.svg"
+              alt="AltınÖtesi logosu"
+              width={96}
+              height={40}
+              className="h-10 w-auto"
+            />
+            <div className="text-sm text-ink-700">
+              <p className="font-medium">{segmentMeta[segment].institution}</p>
+              <p className="text-muted-500">Canlı segment özeti</p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       <Toast
-        open={toastOpen}
-        onClose={() => setToastOpen(false)}
-        tone="info"
-        title="Dışa aktarma demo"
-        description="PDF ve CSV aksiyonları bu MVP’de görsel olarak sunulur."
+        open={Boolean(toast)}
+        onClose={() => setToast(null)}
+        tone={toast?.tone ?? "info"}
+        title={toast?.title ?? ""}
+        description={toast?.description}
       />
     </AppShell>
   );

@@ -231,9 +231,49 @@ export type UrlAnalysis = {
 export type ScamAnalysis = {
   signals: string[];
   level: UrlRiskLevel;
+  overallRiskScore: number;
   summary: string;
   safeReply: string;
   urlAnalyses: UrlAnalysis[];
+};
+
+export type AcademyProgress = {
+  completedLessonIds: string[];
+  updatedAt: string;
+};
+
+export type SavingsGoal = {
+  id: string;
+  title: string;
+  current: number;
+  target: number;
+  durationMonths: number;
+  lastContribution: string;
+  weeklyRhythm: string;
+  tip: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SavingsContribution = {
+  goalId: string;
+  amount: number;
+  createdAt: string;
+};
+
+export type SavingsState = {
+  goals: SavingsGoal[];
+  contributions: SavingsContribution[];
+  updatedAt: string;
+};
+
+export type ScamCheckRecord = {
+  id: string;
+  level: UrlRiskLevel;
+  overallRiskScore: number;
+  signalCount: number;
+  hasUrl: boolean;
+  createdAt: string;
 };
 
 export type ProducerSummary = {
@@ -243,6 +283,56 @@ export type ProducerSummary = {
   hourlyIncome: number;
   restockSuggestion: number;
   goalSuggestion: number;
+};
+
+export type ProducerRecord = {
+  id: string;
+  productName: string;
+  salePrice: number;
+  unitsSold: number;
+  materialCost: number;
+  packagingCost: number;
+  shippingCost: number;
+  laborHours: number;
+  summary: ProducerSummary;
+  createdAt: string;
+};
+
+export type TwinProgress = {
+  completedTaskKeys: string[];
+  updatedAt: string;
+};
+
+export type AiSettings = {
+  apiKey: string;
+  model: string;
+  updatedAt: string;
+};
+
+export type CoachMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt: string;
+};
+
+export type CoachReply = {
+  answer: string;
+  followUps: string[];
+  caution: string;
+};
+
+export type ScamAiCommentary = {
+  explanation: string;
+  nextSteps: string[];
+  safeReply: string;
+};
+
+export type ProducerAiCommentary = {
+  summary: string;
+  actions: string[];
+  budgetFocus: string;
+  nextQuestion: string;
 };
 
 export type ToastTone = "success" | "error" | "warning" | "info";

@@ -21,16 +21,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAppState } from "@/components/providers/app-state-provider";
 import { createDemoResult } from "@/lib/demo";
 import { defaultUserContext } from "@/lib/onboarding";
+import {
+  loadAcademyProgress,
+  loadProducerHistory,
+  loadSavingsState,
+  loadScamHistory,
+  loadTwinProgress,
+  saveTwinProgress,
+} from "@/lib/storage";
 import { buildTwinDimensions } from "@/lib/twin";
-import { LayerScores, Profile, TestResult, TwinDimension, TwinSnapshot, UserContext } from "@/types";
-
-const sparkline = [
-  { day: "Pzt", value: 31 },
-  { day: "Sal", value: 33 },
-  { day: "Çar", value: 35 },
-  { day: "Per", value: 36 },
-  { day: "Cum", value: 38 },
-];
+import {
+  AcademyProgress,
+  LayerScores,
+  ProducerRecord,
+  Profile,
+  ScamCheckRecord,
+  SavingsState,
+  TaskItem,
+  TestResult,
+  TwinDimension,
+  TwinSnapshot,
+  TwinProgress,
+  UserContext,
+} from "@/types";
 
 const defaultDemo = createDemoResult();
 
@@ -106,11 +119,26 @@ function buildSafeResult(raw: TestResult | null) {
   };
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function buildTaskKey(task: TaskItem) {
+  const normalizedTitle = task.title
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll(" ", "-")
+    .replaceAll("/", "-")
+    .replaceAll("?", "")
+    .replaceAll("ı", "i");
+
+  return `${task.href ?? "manual"}:${normalizedTitle}`;
+}
+
 function LoadingState() {
   return (
     <Card>
       <CardContent className="py-10 text-center text-sm text-muted-500">
-        Profil hazırlanıyor...
+        Profil hazirlaniyor...
       </CardContent>
     </Card>
   );
@@ -120,15 +148,15 @@ function EmptyState() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Henüz profil verisi yok</CardTitle>
-        <CardDescription>Önce testi tamamla veya demo verisiyle başla.</CardDescription>
+        <CardTitle>Henuz profil verisi yok</CardTitle>
+        <CardDescription>Once testi tamamla veya demo verisiyle basla.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-3">
         <Link href="/test">
-          <Button>Teste başla</Button>
+          <Button>Teste basla</Button>
         </Link>
         <Link href="/dashboard">
-          <Button variant="ghost">Dashboard’a dön</Button>
+          <Button variant="ghost">Dashboard ekranina don</Button>
         </Link>
       </CardContent>
     </Card>
@@ -137,19 +165,38 @@ function EmptyState() {
 
 export default function TwinPage() {
   const { result, isReady } = useAppState();
-  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+  const [academyProgress, setAcademyProgress] = useState<AcademyProgress | null>(null);
+  const [savingsState, setSavingsState] = useState<SavingsState | null>(null);
+  const [scamHistory, setScamHistory] = useState<ScamCheckRecord[]>([]);
+  const [producerHistory, setProducerHistory] = useState<ProducerRecord[]>([]);
+  const [twinProgress, setTwinProgress] = useState<TwinProgress>({
+    completedTaskKeys: [],
+    updatedAt: new Date().toISOString(),
+  });
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    setAcademyProgress(loadAcademyProgress());
+    setSavingsState(loadSavingsState());
+    setScamHistory(loadScamHistory());
+    setProducerHistory(loadProducerHistory());
+    setTwinProgress(
+      loadTwinProgress() ?? {
+        completedTaskKeys: [],
+        updatedAt: new Date().toISOString(),
+      },
+    );
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveTwinProgress(twinProgress);
+  }, [isHydrated, twinProgress]);
 
   const safeResult = useMemo(() => buildSafeResult(result), [result]);
   const isLegacyProfile = Boolean(result && !result?.userContext);
 
-  const chartData = safeResult
-    ? buildTwinDimensions(safeResult.scores, safeResult.twinDimensions)
-    : DEFAULT_TWIN_DIMENSIONS;
   const tasks =
     safeResult?.profile.weeklyTasks?.length
       ? safeResult.profile.weeklyTasks
@@ -159,15 +206,126 @@ export default function TwinPage() {
       ? safeResult.profile.learningPath
       : DEFAULT_PROFILE.learningPath;
 
+  const completedLessons = academyProgress?.completedLessonIds.length ?? 0;
+  const contributionCount = savingsState?.contributions.length ?? 0;
+  const goalCount = savingsState?.goals.length ?? 0;
+  const scamChecks = scamHistory.length;
+  const producerRuns = producerHistory.length;
+  const moduleActivityCount = [completedLessons, contributionCount, scamChecks, producerRuns].filter(
+    (value) => value > 0,
+  ).length;
+
+  const growthBoost = clamp(
+    Math.round(completedLessons * 1.8 + contributionCount * 1.2 + scamChecks * 2.4 + producerRuns * 2),
+    0,
+    18,
+  );
+  const currentScore = clamp(Math.round((safeResult?.overallScore ?? 38) + growthBoost), 0, 100);
+  const sparkline = useMemo(
+    () => [
+      { day: "Pzt", value: clamp(currentScore - 5, 0, 100) },
+      { day: "Sal", value: clamp(currentScore - 4, 0, 100) },
+      { day: "Car", value: clamp(currentScore - 3, 0, 100) },
+      { day: "Per", value: clamp(currentScore - 1, 0, 100) },
+      { day: "Cum", value: currentScore },
+    ],
+    [currentScore],
+  );
+
+  const chartData = useMemo(() => {
+    const base = safeResult
+      ? buildTwinDimensions(safeResult.scores, safeResult.twinDimensions)
+      : DEFAULT_TWIN_DIMENSIONS;
+
+    return base.map((item) => {
+      if (item.name === "Finansal Bilgi") {
+        return { ...item, value: clamp(item.value + completedLessons * 4, 0, 100) };
+      }
+
+      if (item.name === "Risk Farkındalığı") {
+        return { ...item, value: clamp(item.value + scamChecks * 5, 0, 100) };
+      }
+
+      if (item.name === "Mikro-Birikim Davranışı") {
+        return { ...item, value: clamp(item.value + goalCount * 3 + contributionCount * 2, 0, 100) };
+      }
+
+      if (item.name === "Dolandırıcılık Farkındalığı") {
+        return { ...item, value: clamp(item.value + scamChecks * 4, 0, 100) };
+      }
+
+      if (item.name === "Evden Üretim Gelir Yönetimi") {
+        return { ...item, value: clamp(item.value + producerRuns * 6, 0, 100) };
+      }
+
+      return item;
+    });
+  }, [
+    completedLessons,
+    contributionCount,
+    goalCount,
+    producerRuns,
+    safeResult,
+    scamChecks,
+  ]);
+
+  const autoCompletedTaskKeys = useMemo(() => {
+    const keys = new Set<string>();
+
+    tasks.forEach((task) => {
+      const key = buildTaskKey(task);
+      const href = task.href?.split("?")[0];
+
+      if (href === "/producer" && producerRuns > 0) keys.add(key);
+      if (href === "/savings" && (goalCount > 0 || contributionCount > 0)) keys.add(key);
+      if (href === "/scam-shield" && scamChecks > 0) keys.add(key);
+      if (href === "/academy" && completedLessons > 0) keys.add(key);
+      if (href === "/dashboard" && Boolean(safeResult)) keys.add(key);
+      if (href === "/institution" && moduleActivityCount >= 2) keys.add(key);
+    });
+
+    return keys;
+  }, [
+    completedLessons,
+    contributionCount,
+    goalCount,
+    moduleActivityCount,
+    producerRuns,
+    safeResult,
+    scamChecks,
+    tasks,
+  ]);
+
+  const completedTaskCount = tasks.filter((task) => {
+    const key = buildTaskKey(task);
+    return (
+      autoCompletedTaskKeys.has(key) || twinProgress.completedTaskKeys.includes(key)
+    );
+  }).length;
+
+  const learningPathCards = learningPath.map((item, index) => {
+    const completedByAcademy = index < completedLessons;
+    const recommended = index === completedLessons;
+
+    return {
+      title: item,
+      status: completedByAcademy
+        ? "completed"
+        : recommended
+          ? "recommended"
+          : "locked",
+    } as const;
+  });
+
   if (!isHydrated || !isReady) {
     return (
       <AppShell
         eyebrow="Altınİkiz"
-        title="Finansal güçlenme profilin"
-        description="Profilin hazırlanıyor."
+        title="Finansal guclenme profilin"
+        description="Profilin hazirlaniyor."
         breadcrumb="Anasayfa → Altınİkiz"
         icon={<Activity className="h-5 w-5" />}
-        ethicNotice="Altınİkiz profili sana özel öneriler sunar ama yatırım kararı içermez."
+        ethicNotice="Altınİkiz profili sana ozel oneriler sunar ama yatirim karari icermez."
       >
         <LoadingState />
       </AppShell>
@@ -177,21 +335,22 @@ export default function TwinPage() {
   return (
     <AppShell
       eyebrow="Altınİkiz"
-      title="Finansal güçlenme profilin"
-      description="Profilini, öğrenme ritmini ve ilk odak alanlarını tek ekranda gör."
+      title="Finansal guclenme profilin"
+      description="Profilini, ogrenme ritmini ve modullerdeki gercek ilerlemeyi tek ekranda gor."
       breadcrumb="Anasayfa → Altınİkiz"
       icon={<Activity className="h-5 w-5" />}
-      ethicNotice="Altınİkiz profili sana özel öneriler sunar ama yatırım kararı içermez."
+      ethicNotice="Altınİkiz profili sana ozel oneriler sunar ama yatirim karari icermez."
       aside={
         <Card>
           <CardHeader>
-            <CardTitle>Profil özeti</CardTitle>
+            <CardTitle>Profil ozeti</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-3xl font-medium text-burgundy">
-              {safeResult ? `${Math.round(safeResult.overallScore)}/100` : "--"}
-            </p>
+            <p className="text-3xl font-medium text-burgundy">{currentScore}/100</p>
             {safeResult ? <Badge variant="gold">{safeResult.profile.name}</Badge> : null}
+            <p className="text-sm text-muted-500">
+              {completedTaskCount}/{tasks.length} gorev tamamlandi
+            </p>
           </CardContent>
         </Card>
       }
@@ -203,7 +362,7 @@ export default function TwinPage() {
           {isLegacyProfile ? (
             <Card className="border-warning-500/20 bg-warning-100/70">
               <CardContent className="py-4 text-sm text-ink-700">
-                Profil verin eski formatta görünüyor. Ekran demo uyumlu varsayılanlarla açıldı;
+                Profil verin eski formatta gorunuyor. Ekran demo uyumlu varsayilanlarla acildi;
                 istersen demo verisiyle yenileyebilirsin.
               </CardContent>
             </Card>
@@ -216,7 +375,7 @@ export default function TwinPage() {
                   {(safeResult.userName ?? "M").slice(0, 1)}
                 </div>
                 <div>
-                  <p className="text-sm text-muted-500">Kullanıcı</p>
+                  <p className="text-sm text-muted-500">Kullanici</p>
                   <h2 className="text-3xl font-medium text-ink-900">
                     {safeResult.userName ?? "Misafir"}
                   </h2>
@@ -225,14 +384,14 @@ export default function TwinPage() {
                       {safeResult.profile.name}
                     </Badge>
                     <Badge variant="emerald" size="md">
-                      AltınÖtesi Skoru: {Math.round(safeResult.overallScore)}/100
+                      Guncel hareket skoru: {currentScore}/100
                     </Badge>
                   </div>
                 </div>
               </div>
 
               <div className="card rounded-2xl p-5">
-                <p className="text-sm text-muted-500">Skor görünümü</p>
+                <p className="text-sm text-muted-500">Haftalik hareket</p>
                 <div className="mt-4 h-24">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={sparkline}>
@@ -254,30 +413,30 @@ export default function TwinPage() {
           <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
             <Card>
               <CardHeader>
-                <CardTitle>Kişisel özet</CardTitle>
+                <CardTitle>Kisisel ozet</CardTitle>
                 <CardDescription>{safeResult.profile.shortSummary}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4">
-                  <p className="text-sm text-muted-500">Öğrenme tercihi</p>
+                  <p className="text-sm text-muted-500">Ogrenme tercihi</p>
                   <p className="mt-2 text-base font-medium text-ink-900">
-                    {safeResult.userContext?.learningPreference ?? "Örnek senaryolarla öğrenme"}
+                    {safeResult.userContext?.learningPreference ?? "Ornek senaryolarla ogrenme"}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4">
-                  <p className="text-sm text-muted-500">Haftalık zaman</p>
+                  <p className="text-sm text-muted-500">Haftalik zaman</p>
                   <p className="mt-2 text-base font-medium text-ink-900">
                     {safeResult.userContext?.weeklyTimeCommitment ?? "10 dk"}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4">
-                  <p className="text-sm text-muted-500">Önerilen ton</p>
+                  <p className="text-sm text-muted-500">Onerilen ton</p>
                   <p className="mt-2 text-base font-medium text-ink-900">
                     {safeResult.profile.recommendedTone}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4">
-                  <p className="text-sm text-muted-500">Birincil ihtiyaç</p>
+                  <p className="text-sm text-muted-500">Birincil ihtiyac</p>
                   <p className="mt-2 text-base font-medium text-ink-900">
                     {safeResult.profile.primaryNeed}
                   </p>
@@ -287,19 +446,28 @@ export default function TwinPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Modül öncelik sırası</CardTitle>
-                <CardDescription>İlk odak bu sıraya göre önerilir.</CardDescription>
+                <CardTitle>Canli ilerleme</CardTitle>
+                <CardDescription>Modullerdeki hareketler profilini gunceller.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {safeResult.profile.modulePriority.map((item, index) => (
-                  <div
-                    key={item}
-                    className="flex items-center justify-between rounded-2xl border border-ivory-200 bg-white px-4 py-3"
-                  >
-                    <span className="text-sm text-muted-500">#{index + 1}</span>
-                    <span className="text-base font-medium text-ink-900">{item}</span>
-                  </div>
-                ))}
+              <CardContent className="grid gap-3">
+                <div className="rounded-2xl border border-ivory-200 bg-white px-4 py-3">
+                  <p className="text-sm text-muted-500">Akademi</p>
+                  <p className="mt-2 text-lg font-medium text-ink-900">{completedLessons} ders tamamlandi</p>
+                </div>
+                <div className="rounded-2xl border border-ivory-200 bg-white px-4 py-3">
+                  <p className="text-sm text-muted-500">Kumbara</p>
+                  <p className="mt-2 text-lg font-medium text-ink-900">
+                    {goalCount} hedef • {contributionCount} katki
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-ivory-200 bg-white px-4 py-3">
+                  <p className="text-sm text-muted-500">Scam Shield</p>
+                  <p className="mt-2 text-lg font-medium text-ink-900">{scamChecks} analiz</p>
+                </div>
+                <div className="rounded-2xl border border-ivory-200 bg-white px-4 py-3">
+                  <p className="text-sm text-muted-500">Producer</p>
+                  <p className="mt-2 text-lg font-medium text-ink-900">{producerRuns} kayitli hesap</p>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -308,7 +476,7 @@ export default function TwinPage() {
             <Card variant="premium">
               <CardHeader>
                 <CardTitle>Senin finansal profilin</CardTitle>
-                <CardDescription>5 boyutlu görünüm</CardDescription>
+                <CardDescription>5 boyutlu guncel gorunum</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="h-[340px] w-full">
@@ -349,11 +517,15 @@ export default function TwinPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Bu hafta için görevlerin</CardTitle>
+                <CardTitle>Bu hafta icin gorevlerin</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {tasks.map((task, index) => {
-                  const done = completedTasks.includes(task.title);
+                  const key = buildTaskKey(task);
+                  const autoDone = autoCompletedTaskKeys.has(key);
+                  const manualDone = twinProgress.completedTaskKeys.includes(key);
+                  const done = autoDone || manualDone;
+
                   return (
                     <div
                       key={task.title}
@@ -361,23 +533,11 @@ export default function TwinPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm text-muted-500">Görev {index + 1}</p>
-                          <h3 className="mt-2 text-lg font-medium text-ink-900">
-                            {task.title}
-                          </h3>
-                          <p className="mt-2 text-sm leading-relaxed text-muted-500">
-                            {task.detail}
-                          </p>
+                          <p className="text-sm text-muted-500">Gorev {index + 1}</p>
+                          <h3 className="mt-2 text-lg font-medium text-ink-900">{task.title}</h3>
+                          <p className="mt-2 text-sm leading-relaxed text-muted-500">{task.detail}</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCompletedTasks((current) =>
-                              done
-                                ? current.filter((item) => item !== task.title)
-                                : [...current, task.title],
-                            )
-                          }
+                        <div
                           className={`grid h-8 w-8 place-items-center rounded-full border ${
                             done
                               ? "border-success-500 bg-success-100 text-success-500"
@@ -385,7 +545,7 @@ export default function TwinPage() {
                           }`}
                         >
                           ✓
-                        </button>
+                        </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3">
                         {task.href ? (
@@ -393,21 +553,30 @@ export default function TwinPage() {
                             href={task.href}
                             className="inline-flex items-center gap-2 text-sm font-medium text-burgundy"
                           >
-                            Göreve git <ChevronRight className="h-4 w-4" />
+                            Goreve git <ChevronRight className="h-4 w-4" />
                           </Link>
                         ) : null}
                         <Button
                           variant="ghost"
                           size="sm"
+                          disabled={autoDone}
                           onClick={() =>
-                            setCompletedTasks((current) =>
-                              done
-                                ? current.filter((item) => item !== task.title)
-                                : [...current, task.title],
-                            )
+                            setTwinProgress((current) => {
+                              const hasKey = current.completedTaskKeys.includes(key);
+                              return {
+                                completedTaskKeys: hasKey
+                                  ? current.completedTaskKeys.filter((item) => item !== key)
+                                  : [...current.completedTaskKeys, key],
+                                updatedAt: new Date().toISOString(),
+                              };
+                            })
                           }
                         >
-                          {done ? "İşareti kaldır" : "Tamamlandı olarak işaretle"}
+                          {autoDone
+                            ? "Modul ilerlemesiyle tamamlandi"
+                            : manualDone
+                              ? "Isareti kaldir"
+                              : "Tamamlandi olarak isaretle"}
                         </Button>
                       </div>
                     </div>
@@ -420,54 +589,60 @@ export default function TwinPage() {
           <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
             <Card>
               <CardHeader>
-                <CardTitle>Önerilen yolculuk</CardTitle>
-                <CardDescription>Ders kartları ve kısa öğrenme adımları</CardDescription>
+                <CardTitle>Onerilen yolculuk</CardTitle>
+                <CardDescription>Ders kartlari artik ilerlemeye gore aciliyor.</CardDescription>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <div className="flex min-w-max gap-4 pb-2">
-                  {learningPath.map((item, index) => {
-                    const locked = index >= 2;
-                    return (
-                      <Link key={item} href="/academy" className="w-[260px] shrink-0">
-                        <Card className="h-full">
-                          <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-ivory-100 text-burgundy">
-                                <Sparkles className="h-4 w-4" />
-                              </div>
-                              {locked ? (
-                                <Lock className="h-4 w-4 text-muted-400" />
-                              ) : (
-                                <Badge variant="success">Açık</Badge>
-                              )}
+                  {learningPathCards.map((item) => (
+                    <Link key={item.title} href="/academy" className="w-[260px] shrink-0">
+                      <Card className="h-full">
+                        <CardContent className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-ivory-100 text-burgundy">
+                              <Sparkles className="h-4 w-4" />
                             </div>
-                            <CardTitle className="text-lg">{item}</CardTitle>
-                            <p className="text-sm text-muted-500">5 dk</p>
-                          </CardContent>
-                        </Card>
-                      </Link>
-                    );
-                  })}
+                            {item.status === "locked" ? (
+                              <Lock className="h-4 w-4 text-muted-400" />
+                            ) : item.status === "completed" ? (
+                              <Badge variant="success">Tamamlandi</Badge>
+                            ) : (
+                              <Badge variant="gold">Siradaki</Badge>
+                            )}
+                          </div>
+                          <CardTitle className="text-lg">{item.title}</CardTitle>
+                          <p className="text-sm text-muted-500">5 dk</p>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Neden böyle önerildi?</CardTitle>
-                <CardDescription>Kısa bağlam özeti</CardDescription>
+                <CardTitle>Neden boyle onerildi?</CardTitle>
+                <CardDescription>Kisa baglam ozeti</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4">
                   <p className="text-sm text-muted-500">Motivasyon</p>
                   <p className="mt-2 text-base font-medium text-ink-900">
-                    {safeResult.userContext?.mainMotivation ?? "Finansal özgüven kazanmak"}
+                    {safeResult.userContext?.mainMotivation ?? "Finansal ozguven kazanmak"}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4">
                   <p className="text-sm text-muted-500">Ana engel</p>
                   <p className="mt-2 text-base font-medium text-ink-900">
-                    {safeResult.userContext?.mainBarrier ?? "Nereden başlayacağını bilememek"}
+                    {safeResult.userContext?.mainBarrier ?? "Nereden baslayacagini bilememek"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-ivory-200 bg-white p-4">
+                  <p className="text-sm text-muted-500">Gercek hareket etkisi</p>
+                  <p className="mt-2 text-base font-medium text-ink-900">
+                    Bu hafta {moduleActivityCount} modulde veri olustu ve skor gorunumu buna gore
+                    guncellendi.
                   </p>
                 </div>
               </CardContent>

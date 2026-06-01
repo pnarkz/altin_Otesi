@@ -1,3 +1,4 @@
+import { calculateOverallScore } from "@/lib/scoring";
 import { buildTwinDimensions } from "@/lib/twin";
 import { TestResult, UserContext } from "@/types";
 
@@ -24,10 +25,11 @@ const demoContext: UserContext = {
 export function createDemoResult(): TestResult {
   const scores = {
     knowledge: 42,
-    behavior: 25,
+    behavior: 22,
     risk: 58,
     attitude: 35,
   };
+  const overallScore = calculateOverallScore(scores);
 
   const twinDimensions = buildTwinDimensions(scores, [
     { name: "Finansal Bilgi", value: 42 },
@@ -41,7 +43,7 @@ export function createDemoResult(): TestResult {
     userName: "Ayşe Hanım",
     answers: {},
     scores,
-    overallScore: 38,
+    overallScore,
     userContext: demoContext,
     profile: {
       name: "Evden Üreten Başlangıç",

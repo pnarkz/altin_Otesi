@@ -1,10 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Award, BookOpen, Crown, Lock, Shield, Sparkles, Star } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAppState } from "@/components/providers/app-state-provider";
-import { academyLessons, type AcademyLesson } from "@/lib/academy";
+import {
+  academyLessons,
+  type AcademyLesson,
+  type AcademyLessonStatus,
+} from "@/lib/academy";
+import { loadAcademyProgress, saveAcademyProgress } from "@/lib/storage";
+import { AcademyProgress } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,86 +18,210 @@ import { Progress } from "@/components/ui/progress";
 import { Toast } from "@/components/ui/toast";
 
 const weekMeta = [
-  { week: 1 as const, label: "Hafta 1", title: "Temel", progress: 50, count: 4, completed: "2/4" },
-  { week: 2 as const, label: "Hafta 2", title: "Hedef", progress: 0, count: 3, completed: "0/3" },
-  { week: 3 as const, label: "Hafta 3", title: "Kalkan", progress: 0, count: 3, completed: "0/3" },
-  { week: 4 as const, label: "Hafta 4", title: "İleri", progress: 0, count: 2, completed: "0/2" },
+  { week: 1 as const, label: "Hafta 1", title: "Temel" },
+  { week: 2 as const, label: "Hafta 2", title: "Hedef" },
+  { week: 3 as const, label: "Hafta 3", title: "Kalkan" },
+  { week: 4 as const, label: "Hafta 4", title: "İleri" },
 ];
 
-const badgeMeta = [
-  { title: "İlk Adım", helper: "İlk dersi tamamla", icon: Award, earned: true },
-  { title: "Hedefçi", helper: "Hafta 2’yi bitir", icon: Star, earned: false },
-  { title: "Kalkan Sahibi", helper: "Hafta 3’ü bitir", icon: Shield, earned: false },
-  { title: "Bilge", helper: "Tüm dersleri bitir", icon: Crown, earned: false },
-];
+const defaultAcademyProgress: AcademyProgress = {
+  completedLessonIds: ["lesson-1", "lesson-2"],
+  updatedAt: new Date().toISOString(),
+};
 
-function getStatusLabel(status: AcademyLesson["status"]) {
+type LessonView = AcademyLesson & {
+  status: AcademyLessonStatus;
+  recommended: boolean;
+};
+
+function normalizeTitle(value: string) {
+  return value.toLocaleLowerCase("tr-TR").trim();
+}
+
+function getStatusLabel(status: AcademyLessonStatus) {
   if (status === "completed") return "Tamamlandı";
   if (status === "recommended") return "Önerildi";
   if (status === "in-progress") return "Devam Ediyor";
   return "Kilitli";
 }
 
-function getStatusVariant(status: AcademyLesson["status"]) {
+function getStatusVariant(status: AcademyLessonStatus) {
   if (status === "completed") return "success" as const;
   if (status === "recommended") return "gold" as const;
   if (status === "in-progress") return "info" as const;
   return "neutral" as const;
 }
 
+function buildLessonViews(
+  completedLessonIds: string[],
+  learningPath: string[],
+): LessonView[] {
+  const completedSet = new Set(completedLessonIds);
+  const firstIncompleteIndex = academyLessons.findIndex((lesson) => !completedSet.has(lesson.id));
+  const recommendedTitles = new Set(learningPath.map(normalizeTitle));
+
+  return academyLessons.map((lesson, index) => {
+    let status: AcademyLessonStatus = "locked";
+
+    if (completedSet.has(lesson.id)) {
+      status = "completed";
+    } else if (firstIncompleteIndex === -1) {
+      status = "completed";
+    } else if (index === firstIncompleteIndex) {
+      status = "in-progress";
+    } else if (index > firstIncompleteIndex && index <= firstIncompleteIndex + 3) {
+      status = "recommended";
+    }
+
+    return {
+      ...lesson,
+      status,
+      recommended:
+        recommendedTitles.has(normalizeTitle(lesson.title)) ||
+        status === "recommended" ||
+        status === "in-progress",
+    };
+  });
+}
+
 export default function AcademyPage() {
   const { result } = useAppState();
   const [selectedWeek, setSelectedWeek] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedLesson, setSelectedLesson] = useState<AcademyLesson | null>(academyLessons[0]);
+  const [selectedLessonId, setSelectedLessonId] = useState<string>(academyLessons[0].id);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  const [academyProgress, setAcademyProgress] = useState<AcademyProgress>(defaultAcademyProgress);
+  const [isReady, setIsReady] = useState(false);
   const [toast, setToast] = useState<{
     title: string;
     description?: string;
     tone: "success" | "error" | "warning" | "info";
   } | null>(null);
 
+  useEffect(() => {
+    const saved = loadAcademyProgress();
+    if (saved?.completedLessonIds?.length) {
+      setAcademyProgress(saved);
+    } else {
+      saveAcademyProgress(defaultAcademyProgress);
+    }
+    setIsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+    saveAcademyProgress(academyProgress);
+  }, [academyProgress, isReady]);
+
   const profileName = result?.profile.name ?? "Evden Üreten Başlangıç";
-  const learningPath = result?.profile.learningPath ?? [
-    "Net kâr nasıl hesaplanır?",
-    "Acil durum fonu neden önemlidir?",
-    "Garanti kazanç mesajları nasıl anlaşılır?",
-    "Küçük hedef kumbarası nasıl açılır?",
-  ];
-
-  const visibleLessons = useMemo(
-    () => academyLessons.filter((lesson) => lesson.week === selectedWeek),
-    [selectedWeek],
-  );
-
-  const totalDuration = useMemo(
-    () => academyLessons.reduce((sum, lesson) => sum + lesson.duration, 0),
-    [],
-  );
-
-  const totalCompleted = useMemo(
-    () => academyLessons.filter((lesson) => lesson.status === "completed").length,
-    [],
-  );
-
-  const totalRecommended = useMemo(
+  const learningPath = useMemo(
     () =>
-      academyLessons.filter(
-        (lesson) => lesson.status === "recommended" || lesson.status === "in-progress",
-      ).length,
-    [],
+      result?.profile.learningPath ?? [
+        "Net kâr nasıl hesaplanır?",
+        "Acil durum fonu neden önemlidir?",
+        "Garanti kazanç mesajları nasıl anlaşılır?",
+        "Küçük hedef kumbarası nasıl açılır?",
+      ],
+    [result?.profile.learningPath],
   );
+
+  const lessonViews = useMemo(
+    () => buildLessonViews(academyProgress.completedLessonIds, learningPath),
+    [academyProgress.completedLessonIds, learningPath],
+  );
+
+  const totalCompleted = lessonViews.filter((lesson) => lesson.status === "completed").length;
+  const totalRecommended = lessonViews.filter(
+    (lesson) => lesson.status === "recommended" || lesson.status === "in-progress",
+  ).length;
+  const totalDuration = academyLessons.reduce((sum, lesson) => sum + lesson.duration, 0);
+  const overallProgress = Math.round((totalCompleted / academyLessons.length) * 100);
+  const visibleLessons = lessonViews.filter((lesson) => lesson.week === selectedWeek);
+  const selectedLesson =
+    visibleLessons.find((lesson) => lesson.id === selectedLessonId && lesson.status !== "locked") ??
+    visibleLessons.find((lesson) => lesson.status !== "locked") ??
+    null;
 
   const answeredQuizCount = selectedLesson
     ? selectedLesson.quiz.filter((question) => typeof quizAnswers[question.id] === "number").length
     : 0;
 
-  const placeholders = Math.max(0, 3 - visibleLessons.length);
+  const weekSummaries = weekMeta.map((item) => {
+    const lessons = lessonViews.filter((lesson) => lesson.week === item.week);
+    const completed = lessons.filter((lesson) => lesson.status === "completed").length;
+    return {
+      ...item,
+      count: lessons.length,
+      completed,
+      progress: Math.round((completed / lessons.length) * 100),
+    };
+  });
+
+  const badges = [
+    { title: "İlk Adım", helper: "İlk dersi tamamla", icon: Award, earned: totalCompleted >= 1 },
+    {
+      title: "Hedefçi",
+      helper: "Hafta 2'yi tamamla",
+      icon: Star,
+      earned: weekSummaries.find((item) => item.week === 2)?.progress === 100,
+    },
+    {
+      title: "Kalkan Sahibi",
+      helper: "Hafta 3'ü tamamla",
+      icon: Shield,
+      earned: weekSummaries.find((item) => item.week === 3)?.progress === 100,
+    },
+    {
+      title: "Bilge",
+      helper: "Tüm dersleri tamamla",
+      icon: Crown,
+      earned: totalCompleted === academyLessons.length,
+    },
+  ];
+  const activeBadge = badges.filter((badge) => badge.earned).at(-1)?.title ?? "Hazırlanıyor";
+
+  const nextOpenLesson = lessonViews.find((lesson) => lesson.status !== "completed");
+
+  const markLessonCompleted = (lessonId: string) => {
+    if (academyProgress.completedLessonIds.includes(lessonId)) {
+      setToast({
+        title: "Ders zaten tamamlanmış",
+        description: "İlerleme kaydın korunuyor.",
+        tone: "info",
+      });
+      return;
+    }
+
+    const nextCompletedIds = [...academyProgress.completedLessonIds, lessonId].sort((a, b) => {
+      const left = academyLessons.findIndex((lesson) => lesson.id === a);
+      const right = academyLessons.findIndex((lesson) => lesson.id === b);
+      return left - right;
+    });
+
+    setAcademyProgress({
+      completedLessonIds: nextCompletedIds,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const nextLesson = academyLessons.find((lesson) => !nextCompletedIds.includes(lesson.id));
+    if (nextLesson) {
+      setSelectedWeek(nextLesson.week);
+      setSelectedLessonId(nextLesson.id);
+    }
+
+    setToast({
+      title: "Ders tamamlandı",
+      description: "İlerleme ve rozet görünümü güncellendi.",
+      tone: "success",
+    });
+  };
+
+  if (!isReady) return null;
 
   return (
     <AppShell
       eyebrow="Akademi"
       title="Senin için hazırlanan yolculuk"
-      description="Altınİkiz profiline göre kısa dersler, mini quizler ve net bir ilerleme akışı."
+      description="Altınİkiz profiline göre kısa dersler, mini quizler ve kalıcı bir ilerleme akışı."
       breadcrumb="Anasayfa → Akademi"
       icon={<BookOpen className="h-5 w-5" />}
       ethicNotice="Bu yol haritası Altınİkiz profiline göre önerildi. Yatırım tavsiyesi değildir."
@@ -103,7 +233,7 @@ export default function AcademyPage() {
           <CardContent className="space-y-3">
             <Badge variant="gold">{profileName}</Badge>
             <p className="text-sm text-muted-500">
-              Öneriler profil, hedef ve öğrenme tercihiyle şekillenir.
+              Tamamlanan dersler cihazında saklanır ve kurum paneline yalnızca anonim toplam olarak yansır.
             </p>
           </CardContent>
         </Card>
@@ -121,8 +251,10 @@ export default function AcademyPage() {
             <h2 className="text-2xl font-semibold tracking-tight text-ink-900">
               Senin için hazırlanan yolculuk
             </h2>
-            <p className="text-base text-ink-700">%25 tamamlandı (3/12 ders)</p>
-            <Progress value={25} />
+            <p className="text-base text-ink-700">
+              %{overallProgress} tamamlandı ({totalCompleted}/{academyLessons.length} ders)
+            </p>
+            <Progress value={overallProgress} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -140,14 +272,14 @@ export default function AcademyPage() {
             </Card>
             <Card>
               <CardContent className="space-y-2 pt-6">
-                <p className="text-sm text-muted-500">Önerilen</p>
+                <p className="text-sm text-muted-500">Açık Ders</p>
                 <p className="text-3xl font-medium text-gold-600">{totalRecommended}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="space-y-2 pt-6">
-                <p className="text-sm text-muted-500">Rozet</p>
-                <p className="text-3xl font-medium text-ink-900">1 / 4</p>
+                <p className="text-sm text-muted-500">Aktif Rozet</p>
+                <p className="text-2xl font-medium text-ink-900">{activeBadge}</p>
               </CardContent>
             </Card>
           </div>
@@ -155,15 +287,19 @@ export default function AcademyPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-ivory-200 bg-white p-4">
               <p className="text-sm text-muted-500">İlerleme</p>
-              <p className="mt-2 text-lg font-medium text-ink-900">3 / 12 ders</p>
+              <p className="mt-2 text-lg font-medium text-ink-900">
+                {totalCompleted} / {academyLessons.length} ders
+              </p>
             </div>
             <div className="rounded-2xl border border-ivory-200 bg-white p-4">
               <p className="text-sm text-muted-500">Toplam süre</p>
               <p className="mt-2 text-lg font-medium text-ink-900">~{totalDuration} dk</p>
             </div>
             <div className="rounded-2xl border border-ivory-200 bg-white p-4">
-              <p className="text-sm text-muted-500">Aktif rozet</p>
-              <p className="mt-2 text-lg font-medium text-ink-900">İlk Adım</p>
+              <p className="text-sm text-muted-500">Sıradaki odak</p>
+              <p className="mt-2 text-lg font-medium text-ink-900">
+                {nextOpenLesson?.title ?? "Program tamamlandı"}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -172,10 +308,10 @@ export default function AcademyPage() {
       <Card>
         <CardHeader>
           <CardTitle>4 haftalık yol haritası</CardTitle>
-          <CardDescription>Hafta sekmesine tıkla, o bölümün derslerini aç.</CardDescription>
+          <CardDescription>Hafta sekmesine tıkla, o bölümün açık derslerini gör.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {weekMeta.map((item) => (
+          {weekSummaries.map((item) => (
             <button
               key={item.week}
               type="button"
@@ -188,7 +324,9 @@ export default function AcademyPage() {
             >
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-burgundy">{item.label}</p>
-                <span className="text-xs text-muted-500">{item.completed}</span>
+                <span className="text-xs text-muted-500">
+                  {item.completed}/{item.count}
+                </span>
               </div>
               <p className="mt-2 text-base font-medium text-ink-900">{item.title}</p>
               <p className="mt-2 text-sm text-muted-500">{item.count} ders</p>
@@ -226,8 +364,8 @@ export default function AcademyPage() {
             Ders kartları
           </p>
           <h2 className="text-2xl font-semibold tracking-tight text-ink-900">
-            {weekMeta.find((item) => item.week === selectedWeek)?.label}:{" "}
-            {weekMeta.find((item) => item.week === selectedWeek)?.title}
+            {weekSummaries.find((item) => item.week === selectedWeek)?.label}:{" "}
+            {weekSummaries.find((item) => item.week === selectedWeek)?.title}
           </h2>
         </div>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -235,10 +373,13 @@ export default function AcademyPage() {
             <button
               key={lesson.id}
               type="button"
-              onClick={() => setSelectedLesson(lesson)}
+              onClick={() => lesson.status !== "locked" && setSelectedLessonId(lesson.id)}
               className="text-left"
+              disabled={lesson.status === "locked"}
             >
-              <Card className="h-full hover:-translate-y-0.5">
+              <Card
+                className={`h-full ${lesson.status !== "locked" ? "hover:-translate-y-0.5" : "opacity-80"}`}
+              >
                 <CardContent className="space-y-4 pt-6">
                   <div className="flex items-center justify-between gap-3">
                     <Badge variant={getStatusVariant(lesson.status)}>
@@ -253,37 +394,23 @@ export default function AcademyPage() {
                     <p className="text-sm text-muted-500">{lesson.description}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs text-muted-500">
-                    <span>⏱️ {lesson.duration} dk</span>
+                    <span>{lesson.duration} dk</span>
                     <span>•</span>
-                    <span>🎯 {lesson.level}</span>
+                    <span>{lesson.level}</span>
                     <span>•</span>
-                    <span>📝 {lesson.type}</span>
+                    <span>{lesson.type}</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {lesson.recommended ? <Badge variant="gold">Altınİkiz Öneriyor</Badge> : null}
-                  </div>
+                  {lesson.recommended ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="gold">Altınİkiz öneriyor</Badge>
+                    </div>
+                  ) : null}
                   <div className="rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-3 text-sm text-burgundy">
-                    Dersi Aç →
+                    {lesson.status === "locked" ? "Ders kilitli" : "Dersi aç →"}
                   </div>
                 </CardContent>
               </Card>
             </button>
-          ))}
-          {Array.from({ length: placeholders }).map((_, index) => (
-            <Card key={`placeholder-${index}`} className="h-full border-dashed">
-              <CardContent className="space-y-4 pt-6">
-                <div className="flex items-center justify-between gap-3">
-                  <Badge variant="neutral">Kilitli</Badge>
-                  <Lock className="h-4 w-4 text-muted-400" />
-                </div>
-                <div className="space-y-2">
-                  <CardTitle className="text-lg">Daha Fazla Ders Yakında</CardTitle>
-                  <p className="text-sm text-muted-500">
-                    Yol haritan ilerledikçe yeni içerikler bu alanda açılacak.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           ))}
         </div>
       </section>
@@ -298,7 +425,7 @@ export default function AcademyPage() {
           </h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {academyLessons.map((lesson) => (
+          {lessonViews.map((lesson) => (
             <div key={lesson.id} className="rounded-2xl border border-ivory-200 bg-white px-4 py-4">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-medium text-muted-500">Hafta {lesson.week}</span>
@@ -319,7 +446,7 @@ export default function AcademyPage() {
             <CardDescription>Kısa kazanımları görünür tut.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
-            {badgeMeta.map((item) => {
+            {badges.map((item) => {
               const Icon = item.icon;
               return (
                 <div
@@ -336,9 +463,7 @@ export default function AcademyPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">{item.title}</p>
-                      <p className="mt-1 text-xs">
-                        {item.earned ? "Kazanıldı" : "Kazanılacak"}
-                      </p>
+                      <p className="mt-1 text-xs">{item.earned ? "Kazanıldı" : "Kazanılacak"}</p>
                     </div>
                   </div>
                   <p className="mt-3 text-xs">{item.helper}</p>
@@ -402,7 +527,9 @@ export default function AcademyPage() {
                       {typeof selected === "number" ? (
                         <p
                           className={`mt-3 text-sm ${
-                            selected === question.correctIndex ? "text-emerald-700" : "text-warning-500"
+                            selected === question.correctIndex
+                              ? "text-emerald-700"
+                              : "text-warning-500"
                           }`}
                         >
                           {question.explanation}
@@ -415,22 +542,21 @@ export default function AcademyPage() {
 
               <div className="flex flex-wrap gap-3">
                 <Button
-                  onClick={() =>
-                    setToast({
-                      title: "Ders tamamlandı",
-                      description: "İlerleme ve rozet görünümü demo modunda güncellendi.",
-                      tone: "success",
-                    })
-                  }
+                  onClick={() => markLessonCompleted(selectedLesson.id)}
+                  disabled={selectedLesson.status === "completed"}
                 >
-                  Bu dersi tamamladım
+                  {selectedLesson.status === "completed" ? "Tamamlandı" : "Bu dersi tamamladım"}
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => {
-                    const currentIndex = visibleLessons.findIndex((item) => item.id === selectedLesson.id);
-                    const nextLesson = visibleLessons[currentIndex + 1];
-                    if (nextLesson) setSelectedLesson(nextLesson);
+                    const openLessons = lessonViews.filter((lesson) => lesson.status !== "locked");
+                    const currentIndex = openLessons.findIndex((lesson) => lesson.id === selectedLesson.id);
+                    const nextLesson = openLessons[currentIndex + 1];
+                    if (nextLesson) {
+                      setSelectedWeek(nextLesson.week);
+                      setSelectedLessonId(nextLesson.id);
+                    }
                   }}
                 >
                   Sonraki ders
@@ -438,7 +564,17 @@ export default function AcademyPage() {
               </div>
             </CardContent>
           </Card>
-        ) : null}
+        ) : (
+          <Card variant="premium">
+            <CardHeader>
+              <CardTitle>Bu haftanın dersleri henüz açılmadı</CardTitle>
+              <CardDescription>Önce önceki haftanın açık derslerini tamamla.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-500">
+              Açık durumdaki dersler tamamlandıkça bu haftanın içerikleri otomatik olarak erişilebilir hale gelir.
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card variant="premium">
@@ -446,24 +582,13 @@ export default function AcademyPage() {
           <div className="flex items-center gap-2 text-gold-600">
             <Sparkles className="h-5 w-5" />
             <p className="text-sm font-medium uppercase tracking-[0.18em]">
-              Daha fazla içerik yolda
+              İlerleme notu
             </p>
           </div>
           <p className="text-base text-ink-700">
-            AltınÖtesi Akademi her hafta yeni dersler ve simülasyonlarla zenginleşiyor. Şu an temel programı görüyorsun. İleri seviye, kooperatif ve evden üretim modülleri yakında eklenecek.
+            Tamamlanan dersler, rozetler ve açık içerikler cihazında saklanır. Böylece sonraki açılışta aynı
+            yerden devam edebilirsin.
           </p>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              setToast({
-                title: "Bildirimler demo modunda",
-                description: "Bu akış MVP içinde görsel olarak sunulur.",
-                tone: "info",
-              })
-            }
-          >
-            Bildirimleri Aç
-          </Button>
         </CardContent>
       </Card>
 

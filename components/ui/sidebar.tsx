@@ -15,6 +15,7 @@ import {
   Menu,
   Package,
   PiggyBank,
+  Settings2,
   ShieldAlert,
   Sparkles,
   Target,
@@ -40,7 +41,8 @@ const primaryItems: NavItem[] = [
   { label: "Simülasyon", href: "/simulation", icon: WalletCards, badge: "Demo" },
   { label: "Dolandırıcılık Kalkanı", href: "/scam-shield", icon: ShieldAlert },
   { label: "Evden Üreten Kadın", href: "/producer", icon: Package },
-  { label: "AI Koç", href: "/coach", icon: BrainCircuit, badge: "Demo" },
+  { label: "AI Koç", href: "/coach", icon: BrainCircuit },
+  { label: "Profil ve AI", href: "/profile", icon: Settings2 },
   { label: "Kurum Paneli", href: "/institution?demo=true", icon: BookOpen, badge: "Demo" },
 ];
 

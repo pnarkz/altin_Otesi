@@ -1,9 +1,43 @@
 import { ScamAnalysis, UrlAnalysis, UrlFeatures, UrlRiskLevel } from "@/types";
 
-const trustedDomains = ["halkbank.com.tr", "turkiye.gov.tr", "spk.gov.tr", "tcmb.gov.tr", "bddk.org.tr"];
-const suspiciousTlds = ["xyz", "top", "click", "site", "vip", "live", "loan", "work", "shop"];
-const suspiciousKeywords = ["login", "verify", "update", "bonus", "secure", "gift", "yatirim", "firsat", "kazanc", "banka"];
-const shortenedDomains = ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "rb.gy", "cutt.ly"];
+const trustedDomains = [
+  "halkbank.com.tr",
+  "turkiye.gov.tr",
+  "spk.gov.tr",
+  "tcmb.gov.tr",
+  "bddk.org.tr",
+];
+const suspiciousTlds = [
+  "xyz",
+  "top",
+  "click",
+  "site",
+  "vip",
+  "live",
+  "loan",
+  "work",
+  "shop",
+];
+const suspiciousKeywords = [
+  "login",
+  "verify",
+  "update",
+  "bonus",
+  "secure",
+  "gift",
+  "yatirim",
+  "firsat",
+  "kazanc",
+  "banka",
+];
+const shortenedDomains = [
+  "bit.ly",
+  "tinyurl.com",
+  "t.co",
+  "goo.gl",
+  "rb.gy",
+  "cutt.ly",
+];
 
 function normalizeForMatch(value: string) {
   return value
@@ -60,11 +94,15 @@ export function extractUrlFeatures(url: string, messageContext = ""): UrlFeature
   const tld = hostname.split(".").at(-1) ?? "";
   const trustedDomainMismatch =
     !trustedDomains.includes(hostname) &&
-    ["halkbank", "turkiye", "edevlet", "spk", "tcmb", "bddk"].some((token) => hostname.includes(token));
+    ["halkbank", "turkiye", "edevlet", "spk", "tcmb", "bddk"].some((token) =>
+      hostname.includes(token),
+    );
 
   const brandImpersonation =
-    (matchesBrandContext(normalizedMessage, ["halkbank"]) && hostname !== "halkbank.com.tr") ||
-    (matchesBrandContext(normalizedMessage, ["e-devlet", "edevlet"]) && hostname !== "turkiye.gov.tr") ||
+    (matchesBrandContext(normalizedMessage, ["halkbank"]) &&
+      hostname !== "halkbank.com.tr") ||
+    (matchesBrandContext(normalizedMessage, ["e-devlet", "edevlet"]) &&
+      hostname !== "turkiye.gov.tr") ||
     (matchesBrandContext(normalizedMessage, ["spk"]) && hostname !== "spk.gov.tr") ||
     (matchesBrandContext(normalizedMessage, ["tcmb"]) && hostname !== "tcmb.gov.tr");
 
@@ -78,19 +116,23 @@ export function extractUrlFeatures(url: string, messageContext = ""): UrlFeature
     usesHttp: url.startsWith("http://"),
     isShortenedUrl: shortenedDomains.some((domain) => hostname === domain),
     isTelegramLink: hostname === "t.me" || hostname.endsWith(".telegram.me"),
-    isWhatsappLink: hostname === "wa.me" || hostname === "chat.whatsapp.com" || hostname.endsWith(".whatsapp.com"),
+    isWhatsappLink:
+      hostname === "wa.me" ||
+      hostname === "chat.whatsapp.com" ||
+      hostname.endsWith(".whatsapp.com"),
     hasSuspiciousTld: suspiciousTlds.includes(tld),
-    hasSuspiciousKeywords: suspiciousKeywords.some((keyword) => normalizedUrl.includes(keyword) || pathname.includes(keyword)),
+    hasSuspiciousKeywords: suspiciousKeywords.some(
+      (keyword) => normalizedUrl.includes(keyword) || pathname.includes(keyword),
+    ),
     brandImpersonation,
     trustedDomainMismatch,
-    containsIpAddress: /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)
+    containsIpAddress: /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname),
   };
 }
 
 export function scoreUrlRisk(features: UrlFeatures) {
   let score = 0;
 
-  // This MVP uses a rule-based URL risk score. In a later phase, this function can be replaced by an ML phishing URL classifier.
   if (features.usesHttp) score += 10;
   if (features.isShortenedUrl) score += 20;
   if (features.isTelegramLink || features.isWhatsappLink) score += 20;
@@ -158,21 +200,37 @@ function analyzeUrls(message: string): UrlAnalysis[] {
       riskScore,
       riskLevel,
       features: featureLabels,
-      explanation: buildUrlExplanation(domain || url, riskLevel, featureLabels)
+      explanation: buildUrlExplanation(domain || url, riskLevel, featureLabels),
     };
   });
 }
 
 const textPatterns = [
-  { label: "Garanti kazanç vaadi", regex: /garanti kazanc|kesin kar|kesin kazanc|%100 getiri|garantili getiri/ },
-  { label: "Kısa sürede yüksek getiri", regex: /kisa surede yuksek getiri|hizli kazanc|hemen kazan|\b\d+\s*ayda\b|\b\d+\s*haftada\b|\bgunde\b|iki kati|yuksek getiri/ },
+  {
+    label: "Garanti kazanç vaadi",
+    regex: /garanti kazanc|kesin kar|kesin kazanc|%100 getiri|garantili getiri/,
+  },
+  {
+    label: "Kısa sürede yüksek getiri",
+    regex:
+      /kisa surede yuksek getiri|hizli kazanc|hemen kazan|\b\d+\s*ayda\b|\b\d+\s*haftada\b|\bgunde\b|iki kati|yuksek getiri/,
+  },
   { label: "Bugün son fırsat", regex: /bugun son|sinirli sure|son sans|bugun bitiyor|bugun son firsat/ },
   { label: "IBAN'a para gönderme", regex: /iban|hesap numarasi|hesabima gonder|hesaba para gonder/ },
   { label: "Kimseye söyleme", regex: /kimseye soyleme|sadece sana ozel|gizli kalsin|gizli tut/ },
-  { label: "Lisans/yetki belirsizliği", regex: /lisanssiz|yetkisiz|resmi olmayan|lisans gostermez|yetki bilgisi yok/ },
-  { label: "Kişisel bilgi isteme", regex: /sifreni gonder|tc numara|tc kimlik|kimlik bilgi|kart bilgisi|dogum tarihi/ },
+  {
+    label: "Lisans/yetki belirsizliği",
+    regex: /lisanssiz|yetkisiz|resmi olmayan|lisans gostermez|yetki bilgisi yok/,
+  },
+  {
+    label: "Kişisel bilgi isteme",
+    regex: /sifreni gonder|tc numara|tc kimlik|kimlik bilgi|kart bilgisi|dogum tarihi/,
+  },
   { label: "SMS kodu isteme", regex: /sms kodu|dogrulama kodu|otp/ },
-  { label: "Hızlı karar baskısı", regex: /hemen karar ver|simdi onayla|cok gec olmadan|acele et|kontenjan|bekleme|son firsat/ }
+  {
+    label: "Hızlı karar baskısı",
+    regex: /hemen karar ver|simdi onayla|cok gec olmadan|acele et|kontenjan|bekleme|son firsat/,
+  },
 ];
 
 function getTextRiskLevel(count: number): UrlRiskLevel {
@@ -182,11 +240,19 @@ function getTextRiskLevel(count: number): UrlRiskLevel {
   return "Kritik";
 }
 
+function scoreTextRisk(signalCount: number): number {
+  if (signalCount === 0) return 0;
+  return Math.min(100, signalCount * 18);
+}
+
 export function analyzeScamMessage(message: string): ScamAnalysis {
   const normalizedMessage = normalizeForMatch(message);
-  const signals = textPatterns.filter((pattern) => pattern.regex.test(normalizedMessage)).map((pattern) => pattern.label);
+  const signals = textPatterns
+    .filter((pattern) => pattern.regex.test(normalizedMessage))
+    .map((pattern) => pattern.label);
   const urlAnalyses = analyzeUrls(message);
   const textLevel = getTextRiskLevel(signals.length);
+  const textRiskScore = scoreTextRisk(signals.length);
   const hasCriticalUrl = urlAnalyses.some((analysis) => analysis.riskScore >= 71);
   const hasHighUrl = urlAnalyses.some((analysis) => analysis.riskScore >= 46);
 
@@ -198,6 +264,22 @@ export function analyzeScamMessage(message: string): ScamAnalysis {
     level = "Yüksek";
   }
 
+  const maxUrlRiskScore = urlAnalyses.reduce(
+    (max, analysis) => Math.max(max, analysis.riskScore),
+    0,
+  );
+  const minimumScoreByLevel: Record<UrlRiskLevel, number> = {
+    Düşük: 0,
+    Orta: 30,
+    Yüksek: 60,
+    Kritik: 85,
+  };
+  const overallRiskScore = Math.max(
+    textRiskScore,
+    maxUrlRiskScore,
+    minimumScoreByLevel[level],
+  );
+
   const summaryMap: Record<UrlRiskLevel, string> = {
     Düşük:
       "Belirgin bir baskı sinyali görünmüyor. Yine de resmi kurum kanalı dışında kişisel bilgi veya para paylaşmayın.",
@@ -206,15 +288,16 @@ export function analyzeScamMessage(message: string): ScamAnalysis {
     Yüksek:
       "Birden fazla risk sinyali veya şüpheli bağlantı bulundu. İşlemi durdurup resmi kurum kanallarından teyit alın.",
     Kritik:
-      "Metin sinyalleri ve/veya bağlantı modeli çok yüksek risk gösteriyor. Para, kod veya kişisel bilgi paylaşmayın."
+      "Metin sinyalleri ve/veya bağlantı modeli çok yüksek risk gösteriyor. Para, kod veya kişisel bilgi paylaşmayın.",
   };
 
   return {
     signals,
     level,
+    overallRiskScore,
     summary: summaryMap[level],
     safeReply:
       "Bu talebi resmi kurum kanalı dışında ilerletemem. Yetkili ve doğrulanabilir kaynaklardan bilgi almadan para, kod veya kişisel veri paylaşmayacağım.",
-    urlAnalyses
+    urlAnalyses,
   };
 }
