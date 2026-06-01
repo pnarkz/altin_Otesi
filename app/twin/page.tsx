@@ -164,7 +164,8 @@ function EmptyState() {
 }
 
 export default function TwinPage() {
-  const { result, isReady } = useAppState();
+  const { authSession, result, isReady } = useAppState();
+  const isCorporate = authSession?.role === "corporate";
   const [academyProgress, setAcademyProgress] = useState<AcademyProgress | null>(null);
   const [savingsState, setSavingsState] = useState<SavingsState | null>(null);
   const [scamHistory, setScamHistory] = useState<ScamCheckRecord[]>([]);
@@ -197,14 +198,45 @@ export default function TwinPage() {
   const safeResult = useMemo(() => buildSafeResult(result), [result]);
   const isLegacyProfile = Boolean(result && !result?.userContext);
 
-  const tasks =
-    safeResult?.profile.weeklyTasks?.length
-      ? safeResult.profile.weeklyTasks
-      : DEFAULT_PROFILE.weeklyTasks;
-  const learningPath =
-    safeResult?.profile.learningPath?.length
-      ? safeResult.profile.learningPath
-      : DEFAULT_PROFILE.learningPath;
+  const tasks = useMemo(
+    () =>
+      isCorporate
+        ? [
+            {
+              title: "Calisan ders tamamlama ritmini incele",
+              detail: "Akademi ve gorev hareketlerini kurum acisindan oku.",
+              href: "/institution?demo=true",
+            },
+            {
+              title: "Scam farkindaligi gelisimini kontrol et",
+              detail: "Kurumsal Kalkan analizlerinin artik artip artmadigina bak.",
+              href: "/scam-shield",
+            },
+            {
+              title: "Kurumsal AI Koc ile yeni haftalik mesaj dilini hazirla",
+              detail: "Calisanlara gidecek yeni farkindalik tonunu belirle.",
+              href: "/coach",
+            },
+          ]
+        : safeResult?.profile.weeklyTasks?.length
+          ? safeResult.profile.weeklyTasks
+          : DEFAULT_PROFILE.weeklyTasks,
+    [isCorporate, safeResult?.profile.weeklyTasks],
+  );
+  const learningPath = useMemo(
+    () =>
+      isCorporate
+        ? [
+            "Calisan risk farkindaligi",
+            "Kurumsal scam dili",
+            "Anonim gelisim takibi",
+            "Bildirim ritmi tasarimi",
+          ]
+        : safeResult?.profile.learningPath?.length
+          ? safeResult.profile.learningPath
+          : DEFAULT_PROFILE.learningPath,
+    [isCorporate, safeResult?.profile.learningPath],
+  );
 
   const completedLessons = academyProgress?.completedLessonIds.length ?? 0;
   const contributionCount = savingsState?.contributions.length ?? 0;
@@ -319,9 +351,9 @@ export default function TwinPage() {
 
   if (!isHydrated || !isReady) {
     return (
-      <AppShell
-        eyebrow="Altınİkiz"
-        title="Finansal guclenme profilin"
+        <AppShell
+        eyebrow={isCorporate ? "Kurumsal AltinIkiz" : "Altınİkiz"}
+        title={isCorporate ? "Calisan gelisim gorunumu" : "Finansal guclenme profilin"}
         description="Profilin hazirlaniyor."
         breadcrumb="Anasayfa → Altınİkiz"
         icon={<Activity className="h-5 w-5" />}
@@ -334,16 +366,20 @@ export default function TwinPage() {
 
   return (
     <AppShell
-      eyebrow="Altınİkiz"
-      title="Finansal guclenme profilin"
-      description="Profilini, ogrenme ritmini ve modullerdeki gercek ilerlemeyi tek ekranda gor."
+      eyebrow={isCorporate ? "Kurumsal AltinIkiz" : "Altınİkiz"}
+      title={isCorporate ? "Calisan gelisim gorunumu" : "Finansal guclenme profilin"}
+      description={
+        isCorporate
+          ? "Kurum icindeki calisan ritmini, scam farkindaligini ve gorev tamamlama etkisini tek ekranda gor."
+          : "Profilini, ogrenme ritmini ve modullerdeki gercek ilerlemeyi tek ekranda gor."
+      }
       breadcrumb="Anasayfa → Altınİkiz"
       icon={<Activity className="h-5 w-5" />}
       ethicNotice="Altınİkiz profili sana ozel oneriler sunar ama yatirim karari icermez."
       aside={
         <Card>
           <CardHeader>
-            <CardTitle>Profil ozeti</CardTitle>
+            <CardTitle>{isCorporate ? "Kurum ozeti" : "Profil ozeti"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-3xl font-medium text-burgundy">{currentScore}/100</p>
@@ -413,8 +449,12 @@ export default function TwinPage() {
           <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
             <Card>
               <CardHeader>
-                <CardTitle>Kisisel ozet</CardTitle>
-                <CardDescription>{safeResult.profile.shortSummary}</CardDescription>
+                <CardTitle>{isCorporate ? "Kurumsal ozet" : "Kisisel ozet"}</CardTitle>
+                <CardDescription>
+                  {isCorporate
+                    ? `${authSession?.organizationName ?? "A Bankasi"} icin kurum ici gelisim ritmi ve cihazdaki canli demo hareketleri bu yuzeye yansitiliyor.`
+                    : safeResult.profile.shortSummary}
+                </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4">
@@ -517,7 +557,7 @@ export default function TwinPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Bu hafta icin gorevlerin</CardTitle>
+                <CardTitle>{isCorporate ? "Bu hafta icin kurumsal gorevlerin" : "Bu hafta icin gorevlerin"}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {tasks.map((task, index) => {
@@ -589,8 +629,12 @@ export default function TwinPage() {
           <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
             <Card>
               <CardHeader>
-                <CardTitle>Onerilen yolculuk</CardTitle>
-                <CardDescription>Ders kartlari artik ilerlemeye gore aciliyor.</CardDescription>
+                <CardTitle>{isCorporate ? "Kurumsal yolculuk" : "Onerilen yolculuk"}</CardTitle>
+                <CardDescription>
+                  {isCorporate
+                    ? "Kurumsal ders ve farkindalik kartlari ilerlemeye gore aciliyor."
+                    : "Ders kartlari artik ilerlemeye gore aciliyor."}
+                </CardDescription>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <div className="flex min-w-max gap-4 pb-2">
@@ -622,7 +666,7 @@ export default function TwinPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Neden boyle onerildi?</CardTitle>
+                <CardTitle>{isCorporate ? "Neden kurumsal olarak onerildi?" : "Neden boyle onerildi?"}</CardTitle>
                 <CardDescription>Kisa baglam ozeti</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

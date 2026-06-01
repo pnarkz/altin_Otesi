@@ -1,238 +1,311 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Activity,
   ArrowRight,
-  ClipboardCheck,
-  Package,
-  ShieldAlert,
+  Building2,
+  KeyRound,
+  ShieldCheck,
   Sparkles,
-  Target,
+  UserRound,
 } from "lucide-react";
-import { AppShell } from "@/components/layout/app-shell";
-import { DemoStarter } from "@/components/demo/demo-starter";
+import { useAppState } from "@/components/providers/app-state-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Toast } from "@/components/ui/toast";
+import { authenticateDemoUser } from "@/lib/auth";
+import { createDemoResult } from "@/lib/demo";
+import {
+  clearAcademyProgress,
+  clearCoachMessages,
+  clearProducerHistory,
+  clearScamHistory,
+  clearSavingsState,
+  clearTestProgress,
+  clearTwinProgress,
+} from "@/lib/storage";
+import { AuthRole, ToastTone } from "@/types";
 
-const promises = [
+const roleCards: {
+  role: AuthRole;
+  title: string;
+  description: string;
+  icon: typeof UserRound;
+  accent: string;
+}[] = [
   {
-    title: "Kendi adına hedef oluştur",
-    description: "Küçük hedefleri görünür kıl ve ritim kur.",
-    icon: Target,
-    href: "/savings",
+    role: "individual",
+    title: "Bireysel",
+    description:
+      "Ayse Hanim profiliyle Kumbara, bireysel AltinIkiz ve AI Koc akisina dogrudan giris.",
+    icon: UserRound,
+    accent: "from-gold-400/25 to-coral/20",
   },
   {
-    title: "Riskli mesajları kontrol et",
-    description: "Şüpheli dil ve bağlantıları saniyeler içinde ayırt et.",
-    icon: ShieldAlert,
-    href: "/scam-shield",
-  },
-  {
-    title: "Üretim gelirini görünür kıl",
-    description: "Net kârı, gideri ve ayrılabilecek tutarı net gör.",
-    icon: Package,
-    href: "/producer",
+    role: "corporate",
+    title: "Kurumsal",
+    description: "Kurum paneli, calisan gelisimi, kurumsal AltinIkiz ve kurumsal Kalkan.",
+    icon: Building2,
+    accent: "from-emerald-600/20 to-teal/20",
   },
 ];
 
-const modules = [
-  {
-    title: "AltınÖtesi Skoru",
-    description: "Başlangıç noktanı netleştirir.",
-    href: "/test",
-    icon: ClipboardCheck,
-  },
-  {
-    title: "Altınİkiz",
-    description: "Profilini ve ilk odaklarını tek ekranda toplar.",
-    href: "/twin",
-    icon: Activity,
-  },
-  {
-    title: "Dolandırıcılık Kalkanı",
-    description: "Mesaj ve bağlantı riskini sade biçimde gösterir.",
-    href: "/scam-shield",
-    icon: ShieldAlert,
-  },
-  {
-    title: "Evden Üreten Kadın",
-    description: "Üretim emeğini net tabloya dönüştürür.",
-    href: "/producer",
-    icon: Package,
-  },
-];
+export default function LoginPage() {
+  const router = useRouter();
+  const { authSession, isReady, setAuthSession, setResult } = useAppState();
+  const [role, setRole] = useState<AuthRole>("individual");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [toast, setToast] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
 
-const steps = [
-  "Kısa tanıma akışını tamamla.",
-  "Skorunu ve profilini gör.",
-  "Altınİkiz ile ilk görevlerini seç.",
-  "Kalkan, kumbara ve üretim modülleriyle ilerle.",
-];
+  useEffect(() => {
+    if (!isReady || !authSession) return;
+    router.replace("/dashboard");
+  }, [authSession, isReady, router]);
 
-export default function LandingPage() {
+  const selectedRole = useMemo(
+    () => roleCards.find((item) => item.role === role) ?? roleCards[0],
+    [role],
+  );
+
+  const handleLogin = () => {
+    const session = authenticateDemoUser(role, username, password);
+
+    if (!session) {
+      setToast({
+        title: "Giris bilgileri hatali",
+        description: "Kullanici adi veya sifre uyusmuyor.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (session.role === "individual") {
+      clearTestProgress();
+      clearAcademyProgress();
+      clearSavingsState();
+      clearScamHistory();
+      clearProducerHistory();
+      clearTwinProgress();
+      clearCoachMessages();
+      setResult(createDemoResult());
+    } else {
+      setResult(null);
+    }
+
+    setAuthSession(session);
+    router.push("/dashboard");
+  };
+
+  if (!isReady) {
+    return null;
+  }
+
   return (
-    <AppShell
-      title="AltınÖtesi"
-      description="Kadınların ev ekonomisini, üretimini ve finansal güvenini güçlendiren sosyal FinTech platformu."
-      eyebrow="BİGE Hackathon 2026 — Sosyal FinTech"
-      ethicNotice="AltınÖtesi yatırım tavsiyesi vermez. Tüm deneyim eğitim, farkındalık ve finansal güven amaçlıdır."
-    >
-      <div className="grid gap-6 xl:grid-cols-12">
-        <Card variant="premium" className="xl:col-span-7">
-          <CardHeader className="gap-5">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="gold">BİGE Hackathon 2026</Badge>
-              <Badge variant="emerald">Sosyal FinTech</Badge>
-            </div>
-            <div className="space-y-5">
-              <h1 className="text-4xl font-semibold tracking-tight text-ink-900 md:text-5xl">
-                Altın<span className="text-gold-500">Ötesi</span>
-              </h1>
-              <p className="max-w-3xl text-lg leading-relaxed text-ink-700">
-                Kadınlar zaten ev ekonomisini yönetiyor. Eksik olan, bu becerinin kendi
-                adına finansal güvene dönüşmesi.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-              <Link href="/test">
-                <Button size="lg" iconRight={<ArrowRight className="h-4 w-4" />}>
-                  Teste başla
-                </Button>
-              </Link>
-              <DemoStarter />
-              <a href="#nasil-calisir">
-                <Button variant="ghost" size="lg">
-                  Nasıl çalışır?
-                </Button>
-              </a>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <Card variant="elevated" className="xl:col-span-5">
-          <CardHeader>
-            <Badge variant="neutral">Bugün ne yapabilirsin?</Badge>
-            <CardTitle className="text-2xl font-semibold text-ink-900">
-              Üç net başlangıç
-            </CardTitle>
-            <CardDescription className="text-base text-ink-700">
-              Hedefini seç, riskli mesajı kontrol et, üretim gelirini görünür kıl.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {promises.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="flex items-start gap-4 rounded-2xl border border-ivory-200 bg-white/80 p-4 transition-transform duration-200 hover:-translate-y-0.5"
-                >
-                  <div className="rounded-2xl bg-emerald-600/10 p-3 text-emerald-700">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium text-ink-900">{item.title}</p>
-                    <p className="text-sm text-muted-500">{item.description}</p>
-                  </div>
-                </Link>
-              );
-            })}
-          </CardContent>
-        </Card>
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(212,162,76,0.22),transparent_20%),radial-gradient(circle_at_bottom_right,rgba(215,140,121,0.22),transparent_24%),linear-gradient(135deg,#6f2c39_0%,#6f2c39_46%,#d78c79_100%)] text-white">
+      <div className="absolute inset-0 opacity-35">
+        <div className="absolute -left-20 top-24 h-72 w-72 rotate-12 rounded-[44px] border border-white/10 bg-white/5" />
+        <div className="absolute left-[28%] top-[18%] h-60 w-60 rotate-45 rounded-[36px] border border-white/10 bg-white/5" />
+        <div className="absolute bottom-10 left-16 h-52 w-52 -rotate-12 rounded-[38px] border border-white/10 bg-gold-400/10" />
+        <div className="absolute right-[34%] top-10 h-80 w-80 rounded-full bg-gold-400/12 blur-3xl" />
+        <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-coral/20 blur-3xl" />
       </div>
 
-      <section className="space-y-5">
-        <div className="space-y-2">
-          <Badge variant="gold">Platformun kalbi</Badge>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink-900 md:text-3xl">
-            Dört modül, tek yolculuk
-          </h2>
-        </div>
-        <div className="grid gap-5 md:grid-cols-2">
-          {modules.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Card key={item.title} variant="elevated" className="group">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="rounded-2xl bg-gold-400/15 p-3 text-gold-600">
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <Badge variant="neutral">Canlı</Badge>
-                  </div>
-                  <CardTitle className="text-xl font-semibold text-ink-900">
-                    {item.title}
-                  </CardTitle>
-                  <CardDescription className="text-base text-ink-700">
-                    {item.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Link
-                    href={item.href}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 transition-transform duration-200 group-hover:translate-x-1"
+      <div className="relative mx-auto flex min-h-screen max-w-[1480px] items-center px-4 py-6 lg:px-8">
+        <div className="grid w-full overflow-hidden rounded-[34px] border border-white/10 bg-white/6 shadow-[0_40px_120px_rgba(10,16,40,0.45)] backdrop-blur-xl lg:grid-cols-[1.08fr_0.92fr]">
+          <section className="relative overflow-hidden px-6 py-8 sm:px-10 lg:px-12 lg:py-12">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <Badge variant="gold">AltinOtesi</Badge>
+            </div>
+
+            <div className="max-w-xl space-y-4">
+              <h1 className="text-balance text-4xl font-semibold tracking-tight text-white md:text-5xl">
+                Altınla başlayan güveni, finansal okuryazarlıkla AltınÖtesi’ne taşı
+              </h1>
+            </div>
+
+            <div className="mt-8 rounded-[30px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,248,241,0.98),rgba(245,239,224,0.92))] p-6 shadow-[0_28px_80px_rgba(9,17,35,0.22)]">
+              <div className="rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(212,162,76,0.12),transparent_40%),linear-gradient(180deg,#fffaf4_0%,#f6efe3_100%)] p-4 sm:p-6">
+                <Image
+                  src="/login-logo.png"
+                  alt="AltinOtesi logosu"
+                  width={1200}
+                  height={1200}
+                  priority
+                  className="mx-auto w-full max-w-[520px] mix-blend-multiply saturate-[1.08]"
+                />
+                <p className="mx-auto mt-4 max-w-[560px] text-center text-sm font-medium leading-relaxed text-burgundy sm:text-base">
+                  Kadının emeğini, birikimini ve finansal güvenini AltınÖtesi’ne taşıyoruz.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {[
+                {
+                  icon: ShieldCheck,
+                  title: "Dolandiricilik Kalkani",
+                  text: "Supheli mesaj ve linkleri sade dille yorumlayip guvenli cevap onerisi sunar.",
+                },
+                {
+                  icon: Sparkles,
+                  title: "AltinIkiz yolu",
+                  text: "Test veya hazir profil uzerinden kisisel ya da kurumsal gelisim yolunu gorunur kilar.",
+                },
+                {
+                  icon: KeyRound,
+                  title: "Kumbara ve AI Koc",
+                  text: "Kucuk hedefleri takip eder, AI Koc ile karar dilini finansal okuryazarliga baglar.",
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.title}
+                    className="rounded-[24px] border border-white/10 bg-white/8 px-4 py-4 backdrop-blur-sm"
                   >
-                    Modüle git <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
-
-      <section id="nasil-calisir" className="space-y-5">
-        <div className="space-y-2">
-          <Badge variant="emerald">Nasıl çalışır?</Badge>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink-900 md:text-3xl">
-            Dört adımda ilk ritmini kur
-          </h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {steps.map((step, index) => (
-            <Card key={step}>
-              <CardContent className="space-y-4 pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-burgundy/10 text-sm font-semibold text-burgundy">
-                    {index + 1}
+                    <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-gold-400">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm font-medium text-white">{item.title}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-white/68">{item.text}</p>
                   </div>
-                  <div className="h-px flex-1 bg-gold-400/40" />
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="relative bg-[linear-gradient(180deg,#fffaf4_0%,#f6efe3_100%)] px-6 py-8 text-ink-900 sm:px-10 lg:px-12 lg:py-12">
+            <div className="mx-auto flex h-full max-w-xl flex-col justify-center">
+              <div className="mb-6 space-y-3">
+                <span className="inline-flex items-center rounded-full border border-gold-400/30 bg-gold-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-burgundy">
+                  Giris
+                </span>
+                <h2 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-[2.2rem]">
+                  Hesabina gec
+                </h2>
+                <p className="max-w-md text-sm leading-relaxed text-ink-700 sm:text-base">
+                  Once hangi arayuzu kullanacagini sec. Sag taraftaki alan secimine gore
+                  bireysel veya kurumsal akisa yonlendirileceksin.
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {roleCards.map((item) => {
+                  const Icon = item.icon;
+                  const selected = role === item.role;
+
+                  return (
+                    <button
+                      key={item.role}
+                      type="button"
+                      onClick={() => setRole(item.role)}
+                      className={[
+                        "group rounded-[24px] border px-4 py-4 text-left transition-all duration-200",
+                        selected
+                          ? "border-burgundy/25 bg-white shadow-[0_18px_40px_rgba(111,44,57,0.08)]"
+                          : "border-ivory-200 bg-white/70 hover:border-gold-400/50 hover:bg-white",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div
+                          className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${item.accent} text-burgundy`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                            selected ? "bg-burgundy text-white" : "bg-ivory-100 text-muted-500"
+                          }`}
+                        >
+                          {selected ? "Secili" : "Sec"}
+                        </span>
+                      </div>
+                      <p className="mt-4 text-base font-medium text-ink-900">{item.title}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-muted-500">
+                        {item.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <form
+                className="mt-7 space-y-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleLogin();
+                }}
+              >
+                <div className="rounded-[28px] border border-ivory-200 bg-white/84 p-5 shadow-[0_20px_45px_rgba(26,26,26,0.06)]">
+                  <div className="mb-5 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-ink-900">{selectedRole.title} oturumu</p>
+                      <p className="mt-1 text-sm text-muted-500">
+                        {selectedRole.role === "corporate"
+                          ? "Kurum bilgileri, calisan ritmi ve anonim istatistikler acilir."
+                          : "Ayse Hanim profili test cozulmeden dogrudan yuklenir."}
+                      </p>
+                    </div>
+                    <div className="hidden h-11 w-11 items-center justify-center rounded-2xl bg-burgundy text-white sm:flex">
+                      <ArrowRight className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Input
+                      label="Kullanici adi"
+                      placeholder={role === "corporate" ? "Kurumsal kullanici adi" : "Kullanici adi"}
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                    />
+                    <Input
+                      label="Sifre"
+                      type="password"
+                      placeholder="Sifreni gir"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                    />
+                  </div>
                 </div>
-                <p className="text-sm text-ink-700">{step}</p>
-              </CardContent>
-            </Card>
-          ))}
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button type="submit" size="lg" className="sm:flex-1">
+                    Giris yap
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="lg"
+                    className="sm:flex-1"
+                    onClick={() => {
+                      setUsername("");
+                      setPassword("");
+                    }}
+                  >
+                    Alanlari temizle
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
-      <section>
-        <Card variant="premium" className="text-center">
-          <CardContent className="space-y-5 py-10">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gold-400/15 text-gold-600">
-              <Sparkles className="h-7 w-7" />
-            </div>
-            <div className="space-y-3">
-              <h2 className="text-2xl font-semibold tracking-tight text-ink-900 md:text-3xl">
-                Etik vaat
-              </h2>
-              <p className="mx-auto max-w-3xl text-lg leading-relaxed text-ink-700">
-                Kadına neye yatırım yapacağını söylemiyoruz. Finansal karar verirken neye
-                baktığını anlayabilecek özgüveni kazandırıyoruz.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="rounded-[24px] border border-ivory-200 bg-white/75 p-6">
-        <p className="text-sm text-muted-500">
-          Neden önemli? Türkiye’de kadınların ekonomik hayata katılımı ve finansal güvenliği
-          hâlâ kritik bir sosyal etki alanı.
-        </p>
-      </section>
-    </AppShell>
+      <Toast
+        open={Boolean(toast)}
+        onClose={() => setToast(null)}
+        title={toast?.title ?? ""}
+        description={toast?.description}
+        tone={toast?.tone ?? "info"}
+      />
+    </div>
   );
 }

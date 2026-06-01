@@ -3,20 +3,26 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import {
   clearAiSettings,
+  clearAuthSession,
   clearTestProgress,
   loadAiSettings,
+  loadAuthSession,
   loadTestResult,
+  saveAuthSession,
   saveAiSettings,
   saveTestResult,
 } from "@/lib/storage";
-import { AiSettings, TestResult } from "@/types";
+import { AiSettings, AuthSession, TestResult } from "@/types";
 
 type AppStateContextValue = {
   result: TestResult | null;
   aiSettings: AiSettings | null;
+  authSession: AuthSession | null;
   isReady: boolean;
   setResult: (value: TestResult | null) => void;
   setAiSettings: (value: AiSettings | null) => void;
+  setAuthSession: (value: AuthSession | null) => void;
+  logout: () => void;
 };
 
 const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
@@ -24,11 +30,13 @@ const AppStateContext = createContext<AppStateContextValue | undefined>(undefine
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [result, setResultState] = useState<TestResult | null>(null);
   const [aiSettings, setAiSettingsState] = useState<AiSettings | null>(null);
+  const [authSession, setAuthSessionState] = useState<AuthSession | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     setResultState(loadTestResult());
     setAiSettingsState(loadAiSettings());
+    setAuthSessionState(loadAuthSession());
     setIsReady(true);
   }, []);
 
@@ -55,9 +63,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     clearAiSettings();
   };
 
+  const setAuthSession = (value: AuthSession | null) => {
+    setAuthSessionState(value);
+
+    if (value) {
+      saveAuthSession(value);
+      return;
+    }
+
+    clearAuthSession();
+  };
+
+  const logout = () => {
+    setAuthSession(null);
+  };
+
   return (
     <AppStateContext.Provider
-      value={{ result, aiSettings, isReady, setResult, setAiSettings }}
+      value={{
+        result,
+        aiSettings,
+        authSession,
+        isReady,
+        setResult,
+        setAiSettings,
+        setAuthSession,
+        logout,
+      }}
     >
       {children}
     </AppStateContext.Provider>

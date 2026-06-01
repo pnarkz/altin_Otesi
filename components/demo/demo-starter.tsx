@@ -7,7 +7,7 @@ import { createDemoResult } from "@/lib/demo";
 
 export function DemoStarter({
   redirectTo = "/dashboard",
-  variant = "secondary"
+  variant = "secondary",
 }: {
   redirectTo?: "/dashboard" | "/twin";
   variant?: "primary" | "secondary";
@@ -21,8 +21,13 @@ export function DemoStarter({
   };
 
   return (
-    <Button type="button" onClick={handleClick} variant={variant === "primary" ? "primary" : "secondary"} size="lg">
-      Demo Verisiyle Başlat
+    <Button
+      type="button"
+      onClick={handleClick}
+      variant={variant === "primary" ? "primary" : "secondary"}
+      size="lg"
+    >
+      Hazir profili yukle
     </Button>
   );
 }

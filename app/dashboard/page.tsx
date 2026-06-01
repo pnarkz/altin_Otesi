@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
   BookOpen,
+  BrainCircuit,
+  Building2,
   LayoutDashboard,
   Package,
   PiggyBank,
@@ -19,88 +21,164 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
-import { Toast } from "@/components/ui/toast";
+import {
+  loadAcademyProgress,
+  loadProducerHistory,
+  loadSavingsState,
+  loadScamHistory,
+  loadTwinProgress,
+} from "@/lib/storage";
 
-const actionCards = [
+const individualActionCards = [
   {
-    title: "Dolandırıcılık mesajı analiz et",
-    description: "Şüpheli mesajı veya linki birkaç saniyede kontrol et.",
+    title: "Dolandiricilik mesaji analiz et",
+    description: "Supheli mesaji veya linki birkac saniyede kontrol et.",
     href: "/scam-shield",
     icon: ShieldAlert,
     tone: "danger",
   },
   {
-    title: "Üretim gelirini hesapla",
-    description: "Net kârı, saatlik kazancı ve ayrılabilecek tutarı gör.",
+    title: "Uretim gelirini hesapla",
+    description: "Net kari, saatlik kazanci ve ayrilabilecek tutari gor.",
     href: "/producer",
     icon: Package,
     tone: "emerald",
   },
   {
-    title: "Altınİkiz yol haritana bak",
-    description: "Profilini ve önerilen ilk adımları tek ekranda aç.",
+    title: "AltinIkiz yol haritana bak",
+    description: "Profilini ve onerilen ilk adimlari tek ekranda ac.",
     href: "/twin",
     icon: Activity,
     tone: "gold",
   },
   {
     title: "Kumbara hedefini takip et",
-    description: "Küçük hedefleri görünür kıl ve ilerlemeyi takip et.",
+    description: "Kucuk hedefleri gorunur kil ve ilerlemeyi takip et.",
     href: "/savings",
     icon: PiggyBank,
     tone: "neutral",
   },
 ];
 
+const corporateActionCards = [
+  {
+    title: "Kurum panelini ac",
+    description: "Kurum bilgileri, anonim istatistikler ve sosyal etkiyi gor.",
+    href: "/institution?demo=true",
+    icon: Building2,
+    tone: "gold",
+  },
+  {
+    title: "Kurumsal AltinIkiz",
+    description: "Calisan gelisim ritmini ve gorev tamamlama etkisini izle.",
+    href: "/twin",
+    icon: Activity,
+    tone: "emerald",
+  },
+  {
+    title: "Kurumsal AI Koc",
+    description: "Egitim kurgusu, adaptasyon ve farkindalik dili icin yorum al.",
+    href: "/coach",
+    icon: BrainCircuit,
+    tone: "neutral",
+  },
+  {
+    title: "Kurumsal Kalkan",
+    description: "Phishing ve scam farkindaligi mesajlarini kurumsal gozle degerlendir.",
+    href: "/scam-shield",
+    icon: ShieldAlert,
+    tone: "danger",
+  },
+];
+
 export default function DashboardPage() {
-  const { result } = useAppState();
-  const [toastOpen, setToastOpen] = useState(false);
+  const { authSession, result } = useAppState();
+  const [academyCount, setAcademyCount] = useState(0);
+  const [goalCount, setGoalCount] = useState(0);
+  const [scamChecks, setScamChecks] = useState(0);
+  const [producerRuns, setProducerRuns] = useState(0);
+  const [twinTasks, setTwinTasks] = useState(0);
 
-  const profileName = result?.profile?.name ?? "Evden Üreten Başlangıç";
+  useEffect(() => {
+    setAcademyCount(loadAcademyProgress()?.completedLessonIds.length ?? 0);
+    setGoalCount(loadSavingsState()?.goals.length ?? 0);
+    setScamChecks(loadScamHistory().length);
+    setProducerRuns(loadProducerHistory().length);
+    setTwinTasks(loadTwinProgress()?.completedTaskKeys.length ?? 0);
+  }, []);
+
+  const isCorporate = authSession?.role === "corporate";
+  const profileName = result?.profile?.name ?? "Evden Ureten Baslangic";
   const score = Math.round(result?.overallScore ?? 38);
-  const primaryNeed =
-    result?.profile.primaryNeed ?? "Üretim gelirini görünür hale getirmek";
+  const primaryNeed = result?.profile.primaryNeed ?? "Uretim gelirini gorunur hale getirmek";
 
-  const weeklyTasks = useMemo(
+  const individualWeeklyTasks = useMemo(
     () =>
       result?.profile.weeklyTasks?.slice(0, 3) ?? [
         {
-          title: "Şüpheli mesajı kontrol et",
-          detail: "Bir mesajı Kalkan’da analiz ederek risk dilini tanı.",
+          title: "Supheli mesaji kontrol et",
+          detail: "Bir mesaji Kalkan'da analiz ederek risk dilini tani.",
           href: "/scam-shield",
         },
         {
-          title: "Ürün kârını hesapla",
-          detail: "Producer modülünde tek ürün üzerinden net tablo çıkar.",
+          title: "Urun karini hesapla",
+          detail: "Producer modulu uzerinden net tablo cikar.",
           href: "/producer",
         },
         {
-          title: "Acil durum hedefini güncelle",
-          detail: "Kumbara ekranında küçük hedef ilerlemesini gözden geçir.",
+          title: "Acil durum hedefini guncelle",
+          detail: "Kumbara ekraninda kucuk hedef ilerlemesini gozden gecir.",
           href: "/savings",
         },
       ],
     [result?.profile.weeklyTasks],
   );
 
+  const corporateWeeklyTasks = [
+    {
+      title: "Calisan farkindalik ritmini kontrol et",
+      detail: "Kurum panelinde son tamamlanan ders ve scam analizi trendini oku.",
+      href: "/institution?demo=true",
+    },
+    {
+      title: "Kurumsal AI Koc'tan mesaj dili al",
+      detail: "Calisana yonelik yeni haftalik farkindalik metnini kurgula.",
+      href: "/coach",
+    },
+    {
+      title: "Kurumsal Kalkan ile yeni ornek phishing metni incele",
+      detail: "Kurumsal risk dilini sade ama eyleme donuk bicimde acikla.",
+      href: "/scam-shield",
+    },
+  ];
+
+  const employeeCount = 42;
+  const completionRate = Math.min(96, 58 + academyCount * 4 + twinTasks * 2);
+  const awarenessScore = Math.min(94, 51 + scamChecks * 5);
+  const engagementScore = Math.min(91, 49 + academyCount * 3 + scamChecks * 2 + twinTasks * 2);
+
   return (
     <AppShell
-      title="Genel Bakış"
-      description="Bugünün odağını seç, riski kontrol et ve ilerlemeni tek ekranda izle."
-      eyebrow="Dashboard"
+      title={isCorporate ? "Kurumsal Genel Bakis" : "Genel Bakis"}
+      description={
+        isCorporate
+          ? "Kurum bilgileri, calisan gelisimi ve kurumsal risk farkindaligini tek ekranda izle."
+          : "Bugunun odagini sec, riski kontrol et ve ilerlemeni tek ekranda izle."
+      }
+      eyebrow={isCorporate ? "Kurumsal Dashboard" : "Dashboard"}
       icon={<LayoutDashboard className="h-5 w-5" />}
-      ethicNotice="Tüm finansal bilgileriniz cihazınızda kalır. AltınÖtesi yatırım tavsiyesi vermez."
+      ethicNotice="AltinOtesi yatirim tavsiyesi vermez. Bu yuzey egitim, farkindalik ve sosyal etki icindir."
     >
-      {!result ? (
+      {!isCorporate && !result ? (
         <Card variant="premium">
           <CardContent className="flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
-              <Badge variant="gold">Demo verisi hazır</Badge>
+              <Badge variant="gold">Hazir profil</Badge>
               <p className="text-lg font-medium text-ink-900">
-                Test çözmeden tam demo akışını başlatabilirsin.
+                Test cozmeye gerek kalmadan ornek profil ile akisa gecabilirsin.
               </p>
               <p className="text-sm text-muted-500">
-                Ayşe Hanım profiliyle Twin, Kalkan, Producer ve Akademi akışı açılır.
+                Hazir profil yuklendiginde Twin, Kalkan, Producer ve Akademi akisi acilir.
               </p>
             </div>
             <DemoStarter />
@@ -112,29 +190,39 @@ export default function DashboardPage() {
         <Card variant="premium">
           <CardHeader className="space-y-2.5">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="emerald">Profil</Badge>
-              <Badge variant="gold">{profileName}</Badge>
+              <Badge variant="emerald">{isCorporate ? "Kurum" : "Profil"}</Badge>
+              <Badge variant="gold">
+                {isCorporate ? authSession?.organizationName ?? "A Bankasi" : profileName}
+              </Badge>
             </div>
             <div className="space-y-1.5">
               <CardTitle className="text-xl font-semibold tracking-tight text-ink-900 md:text-[1.7rem]">
-                Bu haftaki odak
+                {isCorporate ? "Bu haftaki kurumsal odak" : "Bu haftaki odak"}
               </CardTitle>
               <CardDescription className="text-sm text-ink-700 md:text-[15px]">
-                {primaryNeed}
+                {isCorporate
+                  ? "Calisan gelisimi, scam farkindaligi ve kurum ici guven dili."
+                  : primaryNeed}
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-emerald-600/20 bg-white/80 px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-500">Profil tonu</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-500">
+                {isCorporate ? "Kurum notu" : "Profil tonu"}
+              </p>
               <p className="mt-2 text-base font-medium text-ink-900">
-                Sade, destekleyici ve adım adım ilerleyen bir akış
+                {isCorporate
+                  ? "A Bankasi pilotunda cihazdaki canli demo verileri kurumsal gorunume yansitiliyor."
+                  : "Sade, destekleyici ve adim adim ilerleyen bir akis"}
               </p>
             </div>
             <div className="rounded-2xl border border-ivory-200 bg-white/80 px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-500">Öncelik</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-500">Oncelik</p>
               <p className="mt-2 text-base font-medium text-ink-900">
-                Üretim gelirini görünür hale getir, sonra riskli mesajları ele
+                {isCorporate
+                  ? "Calisan ritmini guclendir, sonra farkindalik mesajlarini kurumsal dilde yayginlastir."
+                  : "Uretim gelirini gorunur hale getir, sonra riskli mesajlari ele"}
               </p>
             </div>
           </CardContent>
@@ -144,40 +232,59 @@ export default function DashboardPage() {
           <CardHeader>
             <Badge variant="neutral">Bu hafta</Badge>
             <CardTitle className="text-lg font-semibold text-ink-900 md:text-xl">
-              Hızlı özet
+              Hizli ozet
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="rounded-2xl border border-gold-400/30 bg-gold-400/10 px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-500">Skor</p>
-              <p className="mt-2 text-2xl font-semibold text-burgundy">{score}/100</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-500">
+                {isCorporate ? "Gelisim endeksi" : "Skor"}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-burgundy">
+                {isCorporate ? `${engagementScore}/100` : `${score}/100`}
+              </p>
             </div>
             <div className="rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-4">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-500">Bu hafta</p>
-              <p className="mt-2 text-sm text-ink-700">3 kısa adımla ilerlemeyi canlı tut.</p>
+              <p className="mt-2 text-sm text-ink-700">
+                {isCorporate
+                  ? "Kurum paneli, AI Koc ve Kalkan birlikte calisanlarin risk farkindaligini destekler."
+                  : "3 kisa adimla ilerlemeyi canli tut."}
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="AltınÖtesi Skoru" value={String(score)} delta="+5 bu hafta" tone="gold" />
-        <StatCard label="Tamamlanan Görev" value="2/5" delta="Haftalık ritim" tone="emerald" />
-        <StatCard label="Analiz Edilen Mesaj" value="0" delta="İlk analiz bekliyor" tone="info" />
-        <StatCard label="Açık Hedef" value="1" delta="Acil durum kumbarası" tone="neutral" />
+        {isCorporate ? (
+          <>
+            <StatCard label="Aktif Calisan" value={String(employeeCount)} delta="Pilot kurum" tone="gold" />
+            <StatCard label="Egitim Tamamlama" value={`%${completionRate}`} delta="Kurumsal AltinIkiz" tone="emerald" />
+            <StatCard label="Scam Inceleme" value={String(scamChecks)} delta="Kurumsal Kalkan" tone="info" />
+            <StatCard label="Farkindalik Endeksi" value={`${awarenessScore}/100`} delta="AI Koc + Kalkan" tone="neutral" />
+          </>
+        ) : (
+          <>
+            <StatCard label="AltinOtesi Skoru" value={String(score)} delta="+5 bu hafta" tone="gold" />
+            <StatCard label="Tamamlanan Gorev" value={`${twinTasks}/5`} delta="Haftalik ritim" tone="emerald" />
+            <StatCard label="Analiz Edilen Mesaj" value={String(scamChecks)} delta="Canli takip" tone="info" />
+            <StatCard label="Acik Hedef" value={String(goalCount)} delta="Kumbara ilerlemesi" tone="neutral" />
+          </>
+        )}
       </div>
 
       <section className="space-y-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-500">
-            4 ana aksiyon
+            {isCorporate ? "4 kurumsal aksiyon" : "4 ana aksiyon"}
           </p>
           <h2 className="text-xl font-semibold tracking-tight text-ink-900">
-            Bugün ne yapmak istersin?
+            {isCorporate ? "Kurum bugun ne yapmak istiyor?" : "Bugun ne yapmak istersin?"}
           </h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          {actionCards.map((item) => {
+          {(isCorporate ? corporateActionCards : individualActionCards).map((item) => {
             const Icon = item.icon;
             return (
               <Card key={item.title} variant="elevated">
@@ -197,7 +304,7 @@ export default function DashboardPage() {
                               : "neutral"
                       }
                     >
-                      Açık
+                      Acik
                     </Badge>
                   </div>
                   <CardTitle className="text-lg text-ink-900">{item.title}</CardTitle>
@@ -208,7 +315,7 @@ export default function DashboardPage() {
                 <CardContent>
                   <Link href={item.href}>
                     <Button variant="ghost" iconRight={<ArrowRight className="h-4 w-4" />}>
-                      Aç
+                      Ac
                     </Button>
                   </Link>
                 </CardContent>
@@ -221,22 +328,24 @@ export default function DashboardPage() {
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Haftalık yol haritan</CardTitle>
-            <CardDescription>Kısa, net ve uygulanabilir üç adım.</CardDescription>
+            <CardTitle>{isCorporate ? "Haftalik kurumsal yol haritasi" : "Haftalik yol haritan"}</CardTitle>
+            <CardDescription>
+              {isCorporate ? "Kisa, net ve uygulanabilir uc kurumsal adim." : "Kisa, net ve uygulanabilir uc adim."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {weeklyTasks.map((task, index) => (
+            {(isCorporate ? corporateWeeklyTasks : individualWeeklyTasks).map((task, index) => (
               <div
                 key={task.title}
                 className="rounded-2xl border border-ivory-200 bg-white px-4 py-4"
               >
                 <div className="mb-2 flex items-center justify-between">
                   <Badge variant="neutral" size="sm">
-                    Adım {index + 1}
+                    Adim {index + 1}
                   </Badge>
                   {task.href ? (
                     <Link href={task.href} className="text-sm font-medium text-burgundy">
-                      Aç
+                      Ac
                     </Link>
                   ) : null}
                 </div>
@@ -252,18 +361,25 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex items-center gap-2 text-gold-600">
                 <BookOpen className="h-5 w-5" />
-                <CardTitle>Akademi önerileri</CardTitle>
+                <CardTitle>{isCorporate ? "Kurumsal akis onerileri" : "Akademi onerileri"}</CardTitle>
               </div>
-              <CardDescription>Profiline göre iki kısa ders öne çıktı.</CardDescription>
+              <CardDescription>
+                {isCorporate
+                  ? "Calisan gelisimi ve phishing farkindaligi icin iki kisa alan one cikti."
+                  : "Profiline gore iki kisa ders one cikti."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
-              {["Net kâr nasıl hesaplanır?", "Garanti kazanç neden risklidir?"].map((item) => (
+              {(isCorporate
+                ? ["Calisan risk farkindaligi dili", "Phishing bildirimi nasil yazilir?"]
+                : ["Net kar nasil hesaplanir?", "Garanti kazanc neden risklidir?"]
+              ).map((item) => (
                 <div
                   key={item}
                   className="rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-4"
                 >
                   <p className="text-sm font-medium text-ink-900">{item}</p>
-                  <p className="mt-2 text-sm text-muted-500">4 dk • Başlangıç</p>
+                  <p className="mt-2 text-sm text-muted-500">4 dk • Baslangic</p>
                 </div>
               ))}
             </CardContent>
@@ -272,28 +388,32 @@ export default function DashboardPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Simülasyon önerisi</CardTitle>
+                <CardTitle>{isCorporate ? "Kurum bilgisi" : "Simulasyon onerisi"}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-ink-700">
-                  500 TL ile acil durum kararı senaryosu bugünkü profilin için iyi bir pratik.
+                  {isCorporate
+                    ? `${authSession?.organizationName ?? "A Bankasi"} pilotunda ${employeeCount} aktif calisan ve ${completionRate}% egitim tamamlama gorunuyor.`
+                    : "500 TL ile acil durum karari senaryosu bugunku profilin icin iyi bir pratik."}
                 </p>
-                <Link href="/simulation">
-                  <Button variant="ghost">Demo senaryoyu aç</Button>
+                <Link href={isCorporate ? "/institution?demo=true" : "/simulation"}>
+                  <Button variant="ghost">{isCorporate ? "Kurum paneline git" : "Ornek senaryoyu ac"}</Button>
                 </Link>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Kumbara ilerlemesi</CardTitle>
+                <CardTitle>{isCorporate ? "Calisan gelisimi" : "Kumbara ilerlemesi"}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-ink-700">
-                  Acil Durum Param hedefinde ilk adımı görünür hale getir.
+                  {isCorporate
+                    ? `${academyCount} ders tamamlama ve ${twinTasks} gorev isareti bu cihazin kurumsal demo akisini besliyor.`
+                    : "Acil Durum Param hedefinde ilk adimi gorunur hale getir."}
                 </p>
-                <Link href="/savings">
-                  <Button variant="ghost">Hedef kartlarına git</Button>
+                <Link href={isCorporate ? "/twin" : "/savings"}>
+                  <Button variant="ghost">{isCorporate ? "Kurumsal AltinIkiz'e git" : "Hedef kartlarina git"}</Button>
                 </Link>
               </CardContent>
             </Card>
@@ -306,27 +426,23 @@ export default function DashboardPage() {
           <div>
             <div className="mb-2 flex items-center gap-2 text-gold-600">
               <Sparkles className="h-5 w-5" />
-              <p className="text-sm font-medium uppercase tracking-[0.18em]">Sosyal etki</p>
+              <p className="text-sm font-medium uppercase tracking-[0.18em]">
+                {isCorporate ? "Kurumsal etki" : "Sosyal etki"}
+              </p>
             </div>
             <p className="text-base text-ink-700">
-              Bireysel güveni artırırken kurumlara anonim sosyal etki görünürlüğü sunar.
+              {isCorporate
+                ? "Kurumsal yuzey, calisan gelisimini ve risk farkindaligini anonim metriklerle gorunur kilar."
+                : "Bireysel guveni artirirken kurumlara anonim sosyal etki gorunurlugu sunar."}
             </p>
           </div>
           <Link href="/institution?demo=true">
             <Button variant="secondary" iconRight={<ArrowRight className="h-4 w-4" />}>
-              Kurum Paneli
+              {isCorporate ? "Kurum Paneli" : "Kurum Paneli"}
             </Button>
           </Link>
         </CardContent>
       </Card>
-
-      <Toast
-        open={toastOpen}
-        onClose={() => setToastOpen(false)}
-        tone="info"
-        title="Yakında"
-        description="Bu modül yakında demo’da etkin olacak."
-      />
     </AppShell>
   );
 }

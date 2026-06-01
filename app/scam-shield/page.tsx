@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAppState } from "@/components/providers/app-state-provider";
@@ -15,7 +15,7 @@ import { analyzeScamMessage } from "@/lib/scam";
 import { loadScamHistory, saveScamHistory } from "@/lib/storage";
 import { ScamAiCommentary, ScamAnalysis } from "@/types";
 
-const samples = [
+const individualSamples = [
   {
     title: "Sahte banka mesaji",
     text: "Halkbank yatirim firsati! 10.000 TL yatir, 1 ayda 18.000 TL al. Garanti kazanc. Bugun son firsat. IBAN'a gonder, kimseye soyleme. Basvuru: halkbank-firsat.com",
@@ -30,9 +30,29 @@ const samples = [
   },
 ];
 
+const corporateSamples = [
+  {
+    title: "Sahte IT sifre yenileme",
+    text: "BT ekibinden acil bildirim: hesabiniz askiya alinmamak icin sifrenizi hemen yenileyin. Kurumsal dogrulama kodunuzu ve kullanici sifrenizi bu baglantiya girin: abankasi-security.click",
+  },
+  {
+    title: "Sahte yonetici para talebi",
+    text: "Genel mudur adina yaziyorum. Toplantiya giriyorum, bu IBAN'a hemen 85.000 TL gonderin. Onayi sonra ERP'de aciklariz. Kimseye soylemeyin.",
+  },
+  {
+    title: "Sahte IK belge talebi",
+    text: "IK biriminden son hatirlatma. Maas zammi listesi icin kimlik karti, dogum tarihi ve mobil bankacilik onay kodunuzu iletin.",
+  },
+];
+
 export default function ScamShieldPage() {
-  const { aiSettings, result } = useAppState();
-  const [message, setMessage] = useState(samples[0].text);
+  const { aiSettings, authSession, result } = useAppState();
+  const isCorporate = authSession?.role === "corporate";
+  const samples = useMemo(
+    () => (isCorporate ? corporateSamples : individualSamples),
+    [isCorporate],
+  );
+  const [message, setMessage] = useState(individualSamples[0].text);
   const [analysis, setAnalysis] = useState<ScamAnalysis | null>(null);
   const [aiCommentary, setAiCommentary] = useState<ScamAiCommentary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,6 +65,12 @@ export default function ScamShieldPage() {
 
   const length = message.trim().length;
   const livePreview = useMemo(() => (analysis ? analysis : null), [analysis]);
+
+  useEffect(() => {
+    setMessage(samples[0].text);
+    setAnalysis(null);
+    setAiCommentary(null);
+  }, [samples]);
 
   const handleAnalyze = async () => {
     if (length < 10) {
@@ -85,6 +111,8 @@ export default function ScamShieldPage() {
             message,
             analysis: nextAnalysis,
             result,
+            viewerRole: isCorporate ? "corporate" : "individual",
+            organizationName: authSession?.organizationName,
           }),
         );
       } else {
@@ -93,6 +121,8 @@ export default function ScamShieldPage() {
             message,
             analysis: nextAnalysis,
             result,
+            viewerRole: isCorporate ? "corporate" : "individual",
+            organizationName: authSession?.organizationName,
           }),
         );
       }
@@ -102,6 +132,8 @@ export default function ScamShieldPage() {
           message,
           analysis: nextAnalysis,
           result,
+          viewerRole: isCorporate ? "corporate" : "individual",
+          organizationName: authSession?.organizationName,
         }),
       );
       setToast({
@@ -125,9 +157,13 @@ export default function ScamShieldPage() {
 
   return (
     <AppShell
-      eyebrow="Dolandiricilik Kalkani"
-      title="Supheli mesajlari guvenle incele"
-      description="Mesaj ve baglanti risklerini birlikte oku. Risk skoru kural bazlidir, yorum katmani AI ile zenginlesebilir."
+      eyebrow={isCorporate ? "Kurumsal Kalkan" : "Dolandiricilik Kalkani"}
+      title={isCorporate ? "Kurumsal phishing ve scam incelemesi" : "Supheli mesajlari guvenle incele"}
+      description={
+        isCorporate
+          ? "Calisanlara gelen supheli mesajlari kurumsal gozle oku. Risk skoru kural bazlidir, yorum katmani AI ile zenginlesebilir."
+          : "Mesaj ve baglanti risklerini birlikte oku. Risk skoru kural bazlidir, yorum katmani AI ile zenginlesebilir."
+      }
       breadcrumb="Anasayfa → Dolandiricilik Kalkani"
       icon={<ShieldAlert className="h-5 w-5" />}
       ethicNotice="Bu sistem teshis koymaz, risk isareti verir. Son karar her zaman kullaniciya aittir."
@@ -144,7 +180,11 @@ export default function ScamShieldPage() {
                 <Badge variant="neutral">Yerel yorum aktif</Badge>
               )}
             </div>
-            <p>Supheli durumlarda resmi banka kanali veya 155 uzerinden dogrulama yap.</p>
+            <p>
+              {isCorporate
+                ? "Supheli durumda kurumun resmi BT, IK veya guvenlik kanalindan dogrulama yap."
+                : "Supheli durumlarda resmi banka kanali veya 155 uzerinden dogrulama yap."}
+            </p>
             <p>Metin dili ve baglanti riski birlikte okunmalidir.</p>
           </CardContent>
         </Card>
@@ -153,7 +193,7 @@ export default function ScamShieldPage() {
       <section className="grid gap-6 xl:grid-cols-2">
         <Card variant="premium">
           <CardHeader>
-            <CardTitle>Supheli mesaji yapistir</CardTitle>
+            <CardTitle>{isCorporate ? "Supheli kurumsal mesaji yapistir" : "Supheli mesaji yapistir"}</CardTitle>
             <CardDescription>Istersen hazir bir ornekle basla.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">

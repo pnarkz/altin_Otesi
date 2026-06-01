@@ -13,7 +13,7 @@ import { Toast } from "@/components/ui/toast";
 import { DEFAULT_AI_MODEL, maskApiKey } from "@/lib/ai";
 
 export default function ProfilePage() {
-  const { aiSettings, setAiSettings } = useAppState();
+  const { aiSettings, authSession, logout, setAiSettings } = useAppState();
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(DEFAULT_AI_MODEL);
   const [toast, setToast] = useState<{
@@ -127,6 +127,28 @@ export default function ProfilePage() {
         </Card>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Oturum</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-ink-700">
+              <p className="font-medium text-ink-900">
+                {authSession?.organizationName ?? authSession?.displayName ?? "Misafir"}
+              </p>
+              <p>{authSession?.role === "corporate" ? "Kurumsal hesap" : "Bireysel hesap"}</p>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => {
+                  logout();
+                  window.location.href = "/";
+                }}
+              >
+                Cikis yap
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">

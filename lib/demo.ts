@@ -1,22 +1,21 @@
 import { calculateOverallScore } from "@/lib/scoring";
-import { buildTwinDimensions } from "@/lib/twin";
 import { TestResult, UserContext } from "@/types";
 
 const demoContext: UserContext = {
   ageRange: "35-44",
-  userSegment: "Evden üretim yapan",
+  userSegment: "Ev bütçesini yöneten",
   decisionStyle: "Ailemle birlikte",
-  incomePattern: "Düzensiz",
+  incomePattern: "Düşük ama düzenli",
   budgetRole: ["Market", "Mutfak", "Fatura"],
-  monthlyLeftoverRange: "300-700 TL",
+  monthlyLeftoverRange: "100-300 TL",
   householdDecisionPower: 3,
-  hasMicroIncome: "Düzenli olmasa da satış yapıyorum",
-  productionType: "Yemek/pasta/reçel",
-  profitTrackingLevel: "Kabaca biliyorum",
-  personalGoal: ["Acil durum parası", "Yeni ekipman"],
-  mainMotivation: "Evden üretim gelirimi yönetmek",
+  hasMicroIncome: "Hayır",
+  productionType: "Yok",
+  profitTrackingLevel: "Hayır",
+  personalGoal: ["Acil durum parası"],
+  mainMotivation: "Finansal terimleri anlamak",
   mainBarrier: "Nereden başlayacağımı bilmiyorum",
-  scamExperience: "Evet ve zarar gördüm",
+  scamExperience: "Hayır",
   digitalComfort: 2,
   learningPreference: "Örnek senaryolarla öğrenme",
   weeklyTimeCommitment: "10 dk",
@@ -24,20 +23,12 @@ const demoContext: UserContext = {
 
 export function createDemoResult(): TestResult {
   const scores = {
-    knowledge: 42,
-    behavior: 22,
-    risk: 58,
-    attitude: 35,
+    knowledge: 18,
+    behavior: 24,
+    risk: 44,
+    attitude: 32,
   };
   const overallScore = calculateOverallScore(scores);
-
-  const twinDimensions = buildTwinDimensions(scores, [
-    { name: "Finansal Bilgi", value: 42 },
-    { name: "Risk Farkındalığı", value: 58 },
-    { name: "Mikro-Birikim Davranışı", value: 25 },
-    { name: "Dolandırıcılık Farkındalığı", value: 70 },
-    { name: "Evden Üretim Gelir Yönetimi", value: 35 },
-  ]);
 
   return {
     userName: "Ayşe Hanım",
@@ -46,81 +37,86 @@ export function createDemoResult(): TestResult {
     overallScore,
     userContext: demoContext,
     profile: {
-      name: "Evden Üreten Başlangıç",
+      name: "Altınla Biriktiren Başlangıç",
       description:
-        "Üretim emeğini görünür hale getirmeye yakın, gelir-gider farkındalığını sistemli hale getirmeye hazır başlangıç profili.",
+        "Temel finans bilgisi düşük, düzenli ama sınırlı geliri olan ve küçük hedef disiplinini sıfırdan kuracak başlangıç profili.",
       shortSummary:
-        "Ayşe Hanım evden üretim yapıyor, kârını düzenli takip etmiyor ve kendi adına küçük hedef oluşturmak istiyor.",
-      primaryNeed: "Üretim gelirini görünür hale getirmek",
-      mainRisk: "Şüpheli kazanç mesajlarında kararsız kalma",
+        "Ayşe Hanım ev hanımı. Tek düzenli geliri 12.000 TL kira ve finans hakkında başlangıç seviyesinde. Dolandırıcılık deneyimi yok; önce temel kavramları, sonra küçük hedef ritmini kurması gerekiyor.",
+      primaryNeed: "Temel finans terimlerini anlayıp küçük birikimi sistemli hedefe dönüştürmek",
+      mainRisk: "Bilgi eksikliği nedeniyle yanlış yönlendirmelerde kararsız kalmak",
       recommendedTone: "Sade, destekleyici, adım adım",
       learningPath: [
-        "Net kâr nasıl hesaplanır?",
-        "Hedef ayırma alışkanlığı",
+        "Enflasyon nedir?",
         "Acil durum fonu neden önemlidir?",
+        "Bütçe artığı nasıl bulunur?",
         "Garanti kazanç neden risklidir?",
         "Küçük hedef kumbarası nasıl açılır?",
       ],
       weeklyTasks: [
-        {
-          title: "Bu hafta evden ürettiğin bir ürünün net kârını hesapla",
-          detail:
-            "Producer modülünde ürün bilgilerini girerek toplam gelir, gider ve saatlik kazancı görün.",
-          href: "/producer",
-        },
         {
           title: "Acil durum kumbarası için 100 TL hedef oluştur",
           detail: "Kendi adına küçük ama takip edilebilir bir hedef belirle.",
           href: "/savings",
         },
         {
-          title: "Dolandırıcılık Kalkanı’nda 3 örnek mesajı analiz et",
-          detail: "Şüpheli mesajlarda baskı ve marka taklidi dilini pratik et.",
+          title: "Dolandırıcılık Kalkanı'nda 1 örnek mesajı analiz et",
+          detail: "Şüpheli mesajlarda baskı ve marka taklidi dilini ilk kez pratik et.",
           href: "/scam-shield",
+        },
+        {
+          title: "Akademi'de enflasyon ve acil durum fonu derslerini aç",
+          detail: "Temel kavramları kısa içeriklerle netleştir.",
+          href: "/academy",
         },
       ],
       modulePriority: [
-        "Evden Üreten Kadın",
-        "Dolandırıcılık Kalkanı",
         "Kendi Adıma Kumbara",
         "Akademi",
+        "Dolandırıcılık Kalkanı",
+        "Altınİkiz",
       ],
       firstSteps: [
-        "Bu hafta evden ürettiğin bir ürünün net kârını hesapla",
         "Acil durum kumbarası için 100 TL hedef oluştur",
-        "Dolandırıcılık Kalkanı’nda 3 örnek mesajı analiz et",
+        "Dolandırıcılık Kalkanı'nda 1 örnek mesajı analiz et",
+        "Akademi'de enflasyon ve acil durum fonu derslerini aç",
       ],
     },
-    twinDimensions,
+    twinDimensions: [
+      { name: "Finansal Bilgi", value: 18 },
+      { name: "Risk Farkındalığı", value: 44 },
+      { name: "Mikro-Birikim Davranışı", value: 24 },
+      { name: "Dolandırıcılık Farkındalığı", value: 48 },
+      { name: "Evden Üretim Gelir Yönetimi", value: 12 },
+    ],
     twin: {
       dimensions: {
-        financialKnowledge: 42,
-        riskAwareness: 58,
-        microSaving: 25,
-        scamAwareness: 70,
-        homeProductionManagement: 35,
+        financialKnowledge: 18,
+        riskAwareness: 44,
+        microSaving: 24,
+        scamAwareness: 48,
+        homeProductionManagement: 12,
       },
       tasks: [
         {
           id: 1,
-          title: "Bu hafta evden ürettiğin bir ürünün net kârını hesapla",
-          completed: false,
-        },
-        {
-          id: 2,
           title: "Acil durum kumbarası için 100 TL hedef oluştur",
           completed: false,
         },
         {
+          id: 2,
+          title: "Dolandırıcılık Kalkanı'nda 1 örnek mesajı analiz et",
+          completed: false,
+        },
+        {
           id: 3,
-          title: "Dolandırıcılık Kalkanı’nda 3 örnek mesajı analiz et",
+          title: "Akademi'de enflasyon ve acil durum fonu derslerini aç",
           completed: false,
         },
       ],
       learningPath: [
-        { id: "lesson-1", title: "Net kâr nasıl hesaplanır?", status: "recommended" },
-        { id: "lesson-2", title: "Hedef ayırma alışkanlığı", status: "recommended" },
-        { id: "lesson-3", title: "Acil durum fonu nedir?", status: "locked" },
+        { id: "lesson-1", title: "Enflasyon nedir?", status: "recommended" },
+        { id: "lesson-2", title: "Acil durum fonu neden önemlidir?", status: "recommended" },
+        { id: "lesson-3", title: "Bütçe artığı nasıl bulunur?", status: "locked" },
       ],
     },
     completedAt: new Date().toISOString(),

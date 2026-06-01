@@ -1,6 +1,7 @@
 import {
   AcademyProgress,
   AiSettings,
+  AuthSession,
   CoachMessage,
   ProducerRecord,
   ScamCheckRecord,
@@ -19,6 +20,7 @@ const AI_SETTINGS_KEY = "altin-otesi-ai-settings";
 const PRODUCER_HISTORY_KEY = "altin-otesi-producer-history";
 const TWIN_PROGRESS_KEY = "altin-otesi-twin-progress";
 const COACH_MESSAGES_KEY = "altin-otesi-coach-messages";
+const AUTH_SESSION_KEY = "altin-otesi-auth-session";
 
 function loadJson<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
@@ -72,6 +74,11 @@ export function loadAcademyProgress(): AcademyProgress | null {
   return loadJson<AcademyProgress>(ACADEMY_PROGRESS_KEY);
 }
 
+export function clearAcademyProgress() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(ACADEMY_PROGRESS_KEY);
+}
+
 export function saveSavingsState(state: SavingsState) {
   saveJson(SAVINGS_STATE_KEY, state);
 }
@@ -80,12 +87,22 @@ export function loadSavingsState(): SavingsState | null {
   return loadJson<SavingsState>(SAVINGS_STATE_KEY);
 }
 
+export function clearSavingsState() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SAVINGS_STATE_KEY);
+}
+
 export function saveScamHistory(history: ScamCheckRecord[]) {
   saveJson(SCAM_HISTORY_KEY, history);
 }
 
 export function loadScamHistory(): ScamCheckRecord[] {
   return loadJson<ScamCheckRecord[]>(SCAM_HISTORY_KEY) ?? [];
+}
+
+export function clearScamHistory() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SCAM_HISTORY_KEY);
 }
 
 export function saveAiSettings(settings: AiSettings) {
@@ -109,6 +126,11 @@ export function loadProducerHistory(): ProducerRecord[] {
   return loadJson<ProducerRecord[]>(PRODUCER_HISTORY_KEY) ?? [];
 }
 
+export function clearProducerHistory() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(PRODUCER_HISTORY_KEY);
+}
+
 export function saveTwinProgress(progress: TwinProgress) {
   saveJson(TWIN_PROGRESS_KEY, progress);
 }
@@ -117,10 +139,33 @@ export function loadTwinProgress(): TwinProgress | null {
   return loadJson<TwinProgress>(TWIN_PROGRESS_KEY);
 }
 
+export function clearTwinProgress() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(TWIN_PROGRESS_KEY);
+}
+
 export function saveCoachMessages(messages: CoachMessage[]) {
   saveJson(COACH_MESSAGES_KEY, messages);
 }
 
 export function loadCoachMessages(): CoachMessage[] {
   return loadJson<CoachMessage[]>(COACH_MESSAGES_KEY) ?? [];
+}
+
+export function clearCoachMessages() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(COACH_MESSAGES_KEY);
+}
+
+export function saveAuthSession(session: AuthSession) {
+  saveJson(AUTH_SESSION_KEY, session);
+}
+
+export function loadAuthSession(): AuthSession | null {
+  return loadJson<AuthSession>(AUTH_SESSION_KEY);
+}
+
+export function clearAuthSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AUTH_SESSION_KEY);
 }

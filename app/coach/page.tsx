@@ -26,30 +26,44 @@ import {
 } from "@/lib/storage";
 import { CoachMessage, CoachReply, ToastTone } from "@/types";
 
-const starterPrompts = [
+const individualStarterPrompts = [
   "Enflasyon ev butcemi nasil etkiler?",
   "Acil durum fonunu kucuk adimlarla nasil kurabilirim?",
   "Supheli bir link gordugumde ilk neyi kontrol etmeliyim?",
   "Evde urettigim bir urunun kari neden bazen gorundugunden dusuk cikiyor?",
 ];
 
-const welcomeMessage: CoachMessage = {
-  id: "welcome",
-  role: "assistant",
-  text:
-    "Merhaba. Burada finansal kavramlari sade dille aciklarim, ama belirli yatirim urunu veya alim-satim tavsiyesi vermem. Sorunu tek bir durum veya ornek uzerinden sorarsan daha net yardimci olurum.",
-  createdAt: new Date(0).toISOString(),
-};
+const corporateStarterPrompts = [
+  "Calisanlara phishing farkindaligini nasil anlatmaliyim?",
+  "Kurumsal AI Koc ile haftalik farkindalik dili nasil kurulur?",
+  "Calisan gelisimini anonim metriklerle nasil yorumlamaliyim?",
+  "Kurumsal Kalkan ciktisini yoneticilere nasil ozetlemeliyim?",
+];
+
+function buildWelcomeMessage(isCorporate: boolean): CoachMessage {
+  return {
+    id: "welcome",
+    role: "assistant",
+    text: isCorporate
+      ? "Merhaba. Burada kurum tarafindan calisan gelisimi, farkindalik dili ve dolandiricilik risk iletisimini sade dille aciklarim. Belirli yatirim urunu veya alim-satim tavsiyesi vermem."
+      : "Merhaba. Burada finansal kavramlari sade dille aciklarim, ama belirli yatirim urunu veya alim-satim tavsiyesi vermem. Sorunu tek bir durum veya ornek uzerinden sorarsan daha net yardimci olurum.",
+    createdAt: new Date(0).toISOString(),
+  };
+}
 
 function buildCoachPayload(
   question: string,
   messages: CoachMessage[],
   result: ReturnType<typeof useAppState>["result"],
+  viewerRole: "individual" | "corporate",
+  organizationName?: string,
 ): CoachAiPayload {
   return {
     question,
     messages,
     result,
+    viewerRole,
+    organizationName,
     academyProgress: loadAcademyProgress(),
     savingsState: loadSavingsState(),
     scamHistory: loadScamHistory(),
@@ -58,8 +72,11 @@ function buildCoachPayload(
 }
 
 export default function CoachPage() {
-  const { aiSettings, result } = useAppState();
-  const [messages, setMessages] = useState<CoachMessage[]>([welcomeMessage]);
+  const { aiSettings, authSession, result } = useAppState();
+  const isCorporate = authSession?.role === "corporate";
+  const starterPrompts = isCorporate ? corporateStarterPrompts : individualStarterPrompts;
+  const welcomeMessage = useMemo(() => buildWelcomeMessage(isCorporate), [isCorporate]);
+  const [messages, setMessages] = useState<CoachMessage[]>([buildWelcomeMessage(false)]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [historyReady, setHistoryReady] = useState(false);
@@ -77,9 +94,11 @@ export default function CoachPage() {
     const savedMessages = loadCoachMessages();
     if (savedMessages.length > 0) {
       setMessages(savedMessages);
+    } else {
+      setMessages([welcomeMessage]);
     }
     setHistoryReady(true);
-  }, []);
+  }, [welcomeMessage]);
 
   useEffect(() => {
     if (!historyReady) return;
@@ -87,10 +106,14 @@ export default function CoachPage() {
   }, [historyReady, messages]);
 
   const profileSummary = useMemo(() => {
+    if (isCorporate) {
+      return `${authSession?.organizationName ?? "A Bankasi"} • kurumsal farkindalik ve calisan gelisimi`;
+    }
+
     if (!result) return "Test sonucu yok. Genel finansal farkindalik modunda calisiyorum.";
 
     return `${result.profile.name} • ${result.profile.primaryNeed}`;
-  }, [result]);
+  }, [authSession?.organizationName, isCorporate, result]);
 
   const sendQuestion = async (rawQuestion: string) => {
     const trimmed = rawQuestion.trim();
@@ -103,7 +126,13 @@ export default function CoachPage() {
       createdAt: new Date().toISOString(),
     };
     const nextMessages = [...messages, userMessage];
-    const payload = buildCoachPayload(trimmed, nextMessages, result);
+    const payload = buildCoachPayload(
+      trimmed,
+      nextMessages,
+      result,
+      isCorporate ? "corporate" : "individual",
+      authSession?.organizationName,
+    );
 
     setMessages(nextMessages);
     setQuestion("");
@@ -144,9 +173,13 @@ export default function CoachPage() {
 
   return (
     <AppShell
-      eyebrow="AI Koç"
-      title="AI Finans Koçu"
-      description="Profiline ve uygulama icindeki ilerlemene bakarak sade Turkce ile yorum yapar."
+      eyebrow={isCorporate ? "Kurumsal AI Koc" : "AI Koç"}
+      title={isCorporate ? "Kurumsal Finans ve Farkindalik Kocu" : "AI Finans Koçu"}
+      description={
+        isCorporate
+          ? "Kurum bilgileri, calisan gelisimi ve farkindalik akisina gore yorum yapar."
+          : "Profiline ve uygulama icindeki ilerlemene bakarak sade Turkce ile yorum yapar."
+      }
       breadcrumb="Anasayfa → AI Koç"
       icon={<MessageCircle className="h-5 w-5" />}
       ethicNotice="AI Koc egitim ve farkindalik amaclidir. Yatirim kararlari icin yetkili finans kuruluslarina basvurun."
@@ -290,10 +323,10 @@ export default function CoachPage() {
               <Button onClick={() => void sendQuestion(question)} loading={loading}>
                 Gonder
               </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setMessages([welcomeMessage]);
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setMessages([welcomeMessage]);
                   setFollowUps(starterPrompts.slice(0, 2));
                   setCaution(
                     "Belirli bir yatirim urunu, alim-satim zamani veya garanti getiri onerisi vermem.",

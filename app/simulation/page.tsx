@@ -64,7 +64,7 @@ export default function SimulationPage() {
               <Card className={`h-full ${selectedScenarioId === item.id ? "border-gold-400" : ""}`}>
                 <CardContent className="space-y-4 pt-6">
                   <div className="flex items-center justify-between gap-3">
-                    <Badge variant="gold">Demo senaryo</Badge>
+                    <Badge variant="gold">Ornek senaryo</Badge>
                     <Badge variant="neutral">{item.duration}</Badge>
                   </div>
                   <CardTitle className="text-lg">{item.title}</CardTitle>
@@ -73,7 +73,7 @@ export default function SimulationPage() {
                     <Badge variant="emerald">{item.profileHint}</Badge>
                   </div>
                   <div className="rounded-2xl border border-ivory-200 bg-ivory-50 px-4 py-3 text-sm text-burgundy">
-                    Demo senaryo
+                    Ornek senaryo
                   </div>
                 </CardContent>
               </Card>

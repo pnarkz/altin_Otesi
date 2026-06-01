@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -101,7 +102,7 @@ function downloadTextFile(filename: string, content: string, mimeType: string) {
 }
 
 export default function InstitutionPage() {
-  const { result } = useAppState();
+  const { result, authSession } = useAppState();
   const [segment, setSegment] = useState<(typeof segments)[number]>("Tümü");
   const [isDemo, setIsDemo] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -334,7 +335,7 @@ export default function InstitutionPage() {
               <tr><th>Sosyal Etki Endeksi</th><td>${metrics.socialImpactIndex}/100</td></tr>
             </tbody>
           </table>
-          <h2>Canlı Demo Etkisi</h2>
+          <h2>Canlı Kullanım Etkisi</h2>
           <table>
             <tbody>
               <tr><th>Tamamlanan ders</th><td>${metrics.liveSummary.completedLessons}</td></tr>
@@ -355,6 +356,33 @@ export default function InstitutionPage() {
 
   if (!isReady) return null;
 
+  if (authSession?.role !== "corporate") {
+    return (
+      <AppShell
+        eyebrow="Kurum Paneli"
+        title="Kurumsal erisim gerekli"
+        description="Bu ekran yalnizca kurumsal oturum icin acik."
+        breadcrumb="Anasayfa → Kurum Paneli"
+        icon={<Building2 className="h-5 w-5" />}
+        ethicNotice="Bu panelde bireysel veri yoktur."
+      >
+        <Card>
+          <CardContent className="flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <p className="text-lg font-medium text-ink-900">Bu yuzey kurumsal hesaba ayrildi.</p>
+              <p className="text-sm text-muted-500">
+                Kurum bilgileri, istatistikler ve calisan gelisimi yalnizca kurumsal oturumda acilir.
+              </p>
+            </div>
+            <Link href="/dashboard">
+              <Button>Dashboard ekranina don</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
       eyebrow="Kurum Paneli"
@@ -372,7 +400,7 @@ export default function InstitutionPage() {
             <div className="rounded-2xl border border-ivory-200 bg-white px-4 py-3 text-sm text-ink-700">
               {segmentMeta[segment].institution}
             </div>
-            {isDemo ? <Badge variant="gold">Demo modu</Badge> : null}
+            {isDemo ? <Badge variant="gold">Canli gorunum</Badge> : null}
             <div className="rounded-2xl border border-ivory-200 bg-ivory-50 p-4 text-sm text-ink-700">
               <p className="font-medium text-ink-900">Canlı özet</p>
               <p className="mt-2">Ders: {metrics.liveSummary.completedLessons}</p>

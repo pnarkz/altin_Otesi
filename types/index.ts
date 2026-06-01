@@ -285,6 +285,16 @@ export type ProducerSummary = {
   goalSuggestion: number;
 };
 
+export type AuthRole = "individual" | "corporate";
+
+export type AuthSession = {
+  role: AuthRole;
+  username: string;
+  displayName: string;
+  organizationName?: string;
+  createdAt: string;
+};
+
 export type ProducerRecord = {
   id: string;
   productName: string;

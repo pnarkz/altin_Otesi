@@ -19,6 +19,8 @@ export type CoachAiPayload = {
   question: string;
   messages: CoachMessage[];
   result: TestResult | null;
+  viewerRole?: "individual" | "corporate";
+  organizationName?: string;
   academyProgress: AcademyProgress | null;
   savingsState: SavingsState | null;
   scamHistory: ScamCheckRecord[];
@@ -29,6 +31,8 @@ export type ScamAiPayload = {
   message: string;
   analysis: ScamAnalysis;
   result: TestResult | null;
+  viewerRole?: "individual" | "corporate";
+  organizationName?: string;
 };
 
 export type ProducerAiPayload = {
@@ -134,12 +138,39 @@ function buildCoachFollowUps(topic: "scam" | "budget" | "emergency" | "producer"
 
 export function buildLocalCoachReply(payload: CoachAiPayload): CoachReply {
   const text = normalizeText(payload.question);
+  const isCorporate = payload.viewerRole === "corporate";
   const completedLessons = payload.academyProgress?.completedLessonIds.length ?? 0;
   const contributionCount = payload.savingsState?.contributions.length ?? 0;
   const producerCount = payload.producerHistory.length;
   const scamChecks = payload.scamHistory.length;
   const safetyLine =
     "Belirli bir yatirim urunu, alim-satim zamani veya garanti getiri onerisi vermem.";
+
+  if (isCorporate) {
+    if (text.includes("phishing") || text.includes("scam") || text.includes("mesaj")) {
+      return {
+        answer:
+          `${payload.organizationName ?? "Kurum"} icin en saglam dil, calisana korku degil kontrol adimi veren dildir. ` +
+          `Su an bu cihazda ${scamChecks} scam analizi ve ${completedLessons} ders hareketi gorunuyor. Kurumsal mesajlasmada once supheli linke tiklama, sonra resmi BT kanalindan dogrulama, en son bildirim mekanizmasini tek cümlede anlatmak daha etkilidir.`,
+        followUps: [
+          "Calisana gidecek phishing uyarisini 3 maddede nasil yazarim?",
+          "Kurumsal Kalkan ciktisini yonetime nasil ozetlemeliyim?",
+        ],
+        caution: safetyLine,
+      };
+    }
+
+    return {
+      answer:
+        `${payload.organizationName ?? "Kurum"} tarafinda hedef, bireysel yatirim karari degil; calisan farkindaligi, egitim tamamlama ve risk bildirim refleksini guclendirmektir. ` +
+        `Bu cihazdaki hareketlerde ${completedLessons} ders, ${scamChecks} scam analizi ve ${producerCount} diger modul etkisi gorunuyor. Bunlari haftalik kurum dili ve yonetici ozeti uzerinden okumak daha faydalidir.`,
+      followUps: [
+        "Calisan gelisimini haftalik olarak hangi 3 metrikle okumaliyim?",
+        "Kurumsal AI Koc ile yoneticiye gidecek ozet metni nasil kurarim?",
+      ],
+      caution: safetyLine,
+    };
+  }
 
   if (
     text.includes("dolandir") ||
@@ -219,6 +250,7 @@ export function buildLocalCoachReply(payload: CoachAiPayload): CoachReply {
 }
 
 export function buildLocalScamCommentary(payload: ScamAiPayload): ScamAiCommentary {
+  const isCorporate = payload.viewerRole === "corporate";
   const topUrl = payload.analysis.urlAnalyses[0];
   const signalLine =
     payload.analysis.signals.length > 0
@@ -230,11 +262,19 @@ export function buildLocalScamCommentary(payload: ScamAiPayload): ScamAiCommenta
 
   return {
     explanation:
-      `${signalLine} ${urlLine} Bu nedenle skorun temel kaynagi kural bazli tarama; yorum katmani ise kullaniciya neden durmasi gerektigini sade dilde aciklar.`,
+      `${signalLine} ${urlLine} ${
+        isCorporate
+          ? "Bu nedenle kurumsal akis icinde mesaj BT, IK veya yonetici talebi gibi gorunse bile bagimsiz dogrulama zorunlu olmalidir."
+          : "Bu nedenle skorun temel kaynagi kural bazli tarama; yorum katmani ise kullaniciya neden durmasi gerektigini sade dilde aciklar."
+      }`,
     nextSteps: [
-      "Resmi kurum uygulamasi veya resmi web adresi disinda islem yapma.",
+      isCorporate
+        ? "Mesaji kurumun resmi BT, IK veya guvenlik kanalinda bagimsiz olarak dogrula."
+        : "Resmi kurum uygulamasi veya resmi web adresi disinda islem yapma.",
       "Para, OTP, kart bilgisi veya kimlik bilgisi paylasmadan once bagimsiz dogrulama yap.",
-      "Mesaji silmeden once ekran goruntusu alip guvenilir bir yakina veya kuruma danis.",
+      isCorporate
+        ? "Supheli mesaji silmeden once kurum icindeki olay bildirim akisina ilet."
+        : "Mesaji silmeden once ekran goruntusu alip guvenilir bir yakina veya kuruma danis.",
     ],
     safeReply: payload.analysis.safeReply,
   };
@@ -332,6 +372,8 @@ export function buildCoachPrompt(payload: CoachAiPayload) {
   return [
     "Baglam:",
     formatProfileContext(payload.result),
+    `Goruntuleyen rol: ${payload.viewerRole ?? "individual"}`,
+    `Kurum adi: ${payload.organizationName ?? "-"}`,
     `Tamamlanan ders sayisi: ${payload.academyProgress?.completedLessonIds.length ?? 0}`,
     `Kumbara hedef sayisi: ${payload.savingsState?.goals.length ?? 0}`,
     `Kumbara katkisi: ${payload.savingsState?.contributions.length ?? 0}`,
@@ -355,6 +397,8 @@ export function buildScamPrompt(payload: ScamAiPayload) {
     "",
     "Profil baglami:",
     formatProfileContext(payload.result),
+    `Goruntuleyen rol: ${payload.viewerRole ?? "individual"}`,
+    `Kurum adi: ${payload.organizationName ?? "-"}`,
   ].join("\n");
 }
 
